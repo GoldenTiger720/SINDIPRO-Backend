@@ -6,6 +6,6 @@ pillow==11.3.0
 djangorestframework-simplejwt==5.5.1
 python-decouple==3.8
 python-dateutil==2.9.0.post0
-gunicorn
-whitenoise
-drf-spectacular
+gunicorn==22.0.0
+whitenoise==6.5.0
+drf-spectacular==0.27.2
