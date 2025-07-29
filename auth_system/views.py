@@ -1,10 +1,11 @@
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import UserRegistrationSerializer, UserSerializer, UserProfileSerializer
 
 User = get_user_model()
@@ -41,6 +42,49 @@ class RegisterView(generics.CreateAPIView):
         }
         
         return Response(response_data, status=status.HTTP_201_CREATED)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CustomLoginView(TokenObtainPairView):
+    permission_classes = (permissions.AllowAny,)
+    authentication_classes = []
+
+    def post(self, request, *args, **kwargs):
+        # Get the email/username and password from request
+        email = request.data.get('email')
+        password = request.data.get('password')
+        
+        if not email or not password:
+            return Response(
+                {"errors": {"email": "Email is required", "password": "Password is required"}}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Try to authenticate with email (since USERNAME_FIELD is email)
+        user = authenticate(request, username=email, password=password)
+        
+        if user is None:
+            return Response(
+                {"errors": {"credentials": "Invalid email or password"}}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not user.is_active:
+            return Response(
+                {"errors": {"account": "Account is deactivated"}}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        
+        # Prepare response data
+        response_data = {
+            'user': UserSerializer(user).data,
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserProfileSerializer
