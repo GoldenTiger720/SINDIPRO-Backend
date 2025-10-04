@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: sindipro-backend
+    runtime: python3
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn sindipro_backend.wsgi:application"
+    plan: free
+    envVars:
+      - key: SECRET_KEY
+        sync: false
+      - key: DEBUG
+        value: "False"
+      - key: FRONTEND_URL
+        value: "https://sindipro.vercel.app"
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: EMAIL_HOST
+        value: "smtp.gmail.com"
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.10.12"
