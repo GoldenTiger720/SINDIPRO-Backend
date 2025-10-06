@@ -561,6 +561,20 @@ def import_units_excel(request, id):
 
                     identification_display = safe_str(row_data[3], 'Residential')
 
+                    # Normalize identification display value to handle different languages
+                    # Map Portuguese/Spanish to English
+                    identification_normalize_map = {
+                        'comercial': 'Commercial',
+                        'comercială': 'Commercial',
+                        'residencial': 'Residential',
+                        'residential': 'Residential',
+                        'commercial': 'Commercial'
+                    }
+                    identification_display_normalized = identification_normalize_map.get(
+                        identification_display.lower().strip(),
+                        identification_display
+                    )
+
                     # Handle area conversion
                     try:
                         area = float(row_data[4]) if row_data[4] is not None else 0.0
@@ -588,7 +602,7 @@ def import_units_excel(request, id):
 
                     # Map display values back to database values
                     unit_status = status_map.get(status_display, 'vacant')
-                    identification = identification_map.get(identification_display, 'residential')
+                    identification = identification_map.get(identification_display_normalized, 'residential')
 
                     # Map key_delivery values to database-compatible short codes
                     key_delivery_map = {
