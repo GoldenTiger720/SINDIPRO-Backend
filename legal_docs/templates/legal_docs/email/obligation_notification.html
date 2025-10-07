@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notificação de Obrigação Legal</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .logo {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ffffff;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        .logo-subtitle {
+            color: #e0e7ff;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .alert-box {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 4px;
+        }
+        .alert-title {
+            color: #92400e;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        .alert-icon {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            background-color: #f59e0b;
+            border-radius: 50%;
+            color: white;
+            text-align: center;
+            line-height: 24px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        .alert-text {
+            color: #78350f;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .info-section {
+            background-color: #f8fafc;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .info-row {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #475569;
+            min-width: 140px;
+        }
+        .info-value {
+            color: #1e293b;
+            flex: 1;
+        }
+        .building-highlight {
+            color: #1e3a8a;
+            font-weight: bold;
+        }
+        .template-highlight {
+            color: #3b82f6;
+            font-weight: bold;
+        }
+        .date-highlight {
+            color: #dc2626;
+            font-weight: bold;
+        }
+        .action-section {
+            background-color: #eff6ff;
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .action-title {
+            color: #1e40af;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .action-text {
+            color: #1e40af;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .footer {
+            background-color: #1e293b;
+            color: #94a3b8;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+        }
+        .footer a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header with Logo -->
+        <div class="header">
+            {% if use_logo_image %}
+            <img src="cid:sindipro_logo" alt="SINDIPRO" style="max-width: 200px; height: auto; margin-bottom: 10px;">
+            <div class="logo-subtitle">Sistema de Gestão Predial</div>
+            {% else %}
+            <div class="logo">SINDIPRO</div>
+            <div class="logo-subtitle">Sistema de Gestão Predial</div>
+            {% endif %}
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <!-- Alert Box -->
+            <div class="alert-box">
+                <div class="alert-title">
+                    <span class="alert-icon">!</span>
+                    Atenção: Obrigação Legal Próxima ao Vencimento
+                </div>
+                <div class="alert-text">
+                    Uma obrigação legal importante está se aproximando da data de vencimento e requer sua atenção.
+                </div>
+            </div>
+
+            <!-- Information Section -->
+            <div class="info-section">
+                <div class="info-row">
+                    <div class="info-label">Edifício:</div>
+                    <div class="info-value building-highlight">{{ building_name }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Obrigação:</div>
+                    <div class="info-value template-highlight">{{ template_name }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Data de Vencimento:</div>
+                    <div class="info-value date-highlight">{{ due_date }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Dias Restantes:</div>
+                    <div class="info-value">{{ days_remaining }} dias</div>
+                </div>
+            </div>
+
+            <!-- Action Section -->
+            <div class="action-section">
+                <div class="action-title">📋 Ação Necessária</div>
+                <div class="action-text">
+                    Por favor, tome as providências necessárias para cumprir esta obrigação legal dentro do prazo estabelecido.
+                    Entre em contato com os responsáveis e prepare toda a documentação necessária.
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>SINDIPRO</strong> - Sistema de Gestão Predial</p>
+            <p>Este é um e-mail automático. Por favor, não responda.</p>
+            <p>© {{ current_year }} SINDIPRO. Todos os direitos reservados.</p>
+        </div>
+    </div>
+</body>
+</html>

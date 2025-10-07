@@ -29,6 +29,9 @@ def schedule_notification_email(template):
         if not email_list:
             return
 
+        # Get building name
+        building_name = template.building.building_name if template.building else "Edifício não especificado"
+
         # Create crontab schedule for the notification date
         schedule, created = CrontabSchedule.objects.get_or_create(
             minute=0,
@@ -43,12 +46,18 @@ def schedule_notification_email(template):
         # Delete existing task if it exists
         PeriodicTask.objects.filter(name=task_name).delete()
 
-        # Create new periodic task
+        # Create new periodic task with building name and due date
         PeriodicTask.objects.create(
             crontab=schedule,
             name=task_name,
             task='legal_docs.tasks.send_legal_obligation_notification',
-            args=json.dumps([template.id, email_list, template.name]),
+            args=json.dumps([
+                template.id,
+                email_list,
+                template.name,
+                building_name,
+                template.due_month.isoformat()
+            ]),
             one_off=True,  # Execute only once
             start_time=notification_date,
         )
