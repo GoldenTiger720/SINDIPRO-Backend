@@ -34,21 +34,84 @@ def equipment_list_create(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['POST'])
+@api_view(['POST', 'GET'])
 @permission_classes([IsAuthenticated])
-def create_maintenance_record(request, equipment_id):
+def maintenance_record_list_create(request, equipment_id):
     equipment = get_object_or_404(Equipment, id=equipment_id, created_by=request.user)
-    
-    serializer = MaintenanceRecordSerializer(data=request.data)
-    
-    if serializer.is_valid():
-        maintenance_record = serializer.save(equipment=equipment)
+
+    if request.method == 'GET':
+        maintenance_records = MaintenanceRecord.objects.filter(equipment=equipment)
+        serializer = MaintenanceRecordSerializer(maintenance_records, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        serializer = MaintenanceRecordSerializer(data=request.data)
+
+        if serializer.is_valid():
+            maintenance_record = serializer.save(equipment=equipment)
+            return Response({
+                'message': 'Maintenance record created successfully',
+                'maintenance_record_id': maintenance_record.id
+            }, status=status.HTTP_201_CREATED)
+
         return Response({
-            'message': 'Maintenance record created successfully',
-            'maintenance_record_id': maintenance_record.id
-        }, status=status.HTTP_201_CREATED)
-    
-    return Response({
-        'error': 'Invalid data',
-        'details': serializer.errors
-    }, status=status.HTTP_400_BAD_REQUEST)
+            'error': 'Invalid data',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def maintenance_record_detail(request, equipment_id, maintenance_id):
+    equipment = get_object_or_404(Equipment, id=equipment_id, created_by=request.user)
+    maintenance_record = get_object_or_404(MaintenanceRecord, id=maintenance_id, equipment=equipment)
+
+    if request.method == 'PUT':
+        serializer = MaintenanceRecordSerializer(maintenance_record, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Maintenance record updated successfully',
+                'maintenance_record_id': maintenance_record.id
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            'error': 'Invalid data',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        maintenance_record.delete()
+        return Response({
+            'message': 'Maintenance record deleted successfully'
+        }, status=status.HTTP_200_OK)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def equipment_detail(request, equipment_id):
+    equipment = get_object_or_404(Equipment, id=equipment_id, created_by=request.user)
+
+    if request.method == 'PUT':
+        serializer = EquipmentSerializer(equipment, data=request.data, partial=True, context={'request': request})
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Equipment updated successfully',
+                'equipment_id': equipment.id,
+                'equipment_name': equipment.name
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            'error': 'Invalid data',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        equipment_name = equipment.name
+        equipment.delete()
+        return Response({
+            'message': f'Equipment "{equipment_name}" deleted successfully'
+        }, status=status.HTTP_200_OK)

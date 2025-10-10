@@ -7,7 +7,8 @@ class MaintenanceRecordSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MaintenanceRecord
-        fields = ['cost', 'date', 'description', 'notes', 'technician', 'technicianPhone', 'type']
+        fields = ['id', 'cost', 'date', 'description', 'notes', 'technician', 'technicianPhone', 'type']
+        read_only_fields = ['id']
 
 
 class EquipmentSerializer(serializers.ModelSerializer):
