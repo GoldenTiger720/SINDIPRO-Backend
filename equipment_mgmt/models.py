@@ -67,8 +67,9 @@ class MaintenanceRecord(models.Model):
     description = models.TextField()
     notes = models.TextField()
     technician = models.CharField(max_length=200)
+    technician_phone = models.CharField(max_length=20, blank=True, null=True)
     type = models.CharField(max_length=200)
-    
+
     def __str__(self):
         return f"{self.equipment.name} - {self.type} - {self.date}"
 

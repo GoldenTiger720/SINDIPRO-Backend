@@ -5,15 +5,16 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from .models import Equipment, MaintenanceRecord, EquipmentDocument
-from .serializers import EquipmentSerializer, MaintenanceRecordSerializer, EquipmentDocumentSerializer
+from .serializers import EquipmentSerializer, MaintenanceRecordSerializer, EquipmentDocumentSerializer, EquipmentWithMaintenanceSerializer
 
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def equipment_list_create(request):
     if request.method == 'GET':
-        equipment = Equipment.objects.filter(created_by=request.user)
-        serializer = EquipmentSerializer(equipment, many=True)
+        # Optimize query with prefetch_related to avoid N+1 queries
+        equipment = Equipment.objects.filter(created_by=request.user).prefetch_related('maintenance_records')
+        serializer = EquipmentWithMaintenanceSerializer(equipment, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
