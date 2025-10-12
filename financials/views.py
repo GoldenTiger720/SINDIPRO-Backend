@@ -336,3 +336,72 @@ def financial_report_view(request):
 
     serializer = FinancialReportSerializer(data)
     return Response(serializer.to_representation(data), status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def additional_charge_view(request):
+    """
+    GET: Retrieve additional charges
+         Query parameters:
+         - building_id (required)
+         - reference_month (optional)
+    POST: Create a new additional charge
+    """
+    if request.method == 'GET':
+        building_id = request.GET.get('building_id')
+        if not building_id:
+            return Response({'error': 'building_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .models import AdditionalCharge
+        from .serializers import AdditionalChargeSerializer
+
+        charges = AdditionalCharge.objects.filter(building_id=building_id)
+
+        # Optional filter by reference_month
+        reference_month = request.GET.get('reference_month')
+        if reference_month:
+            charges = charges.filter(reference_month=reference_month)
+
+        charges = charges.order_by('-reference_month', '-created_at')
+        serializer = AdditionalChargeSerializer(charges, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        from .serializers import AdditionalChargeSerializer
+
+        serializer = AdditionalChargeSerializer(data=request.data)
+        if serializer.is_valid():
+            charge = serializer.save()
+            response_serializer = AdditionalChargeSerializer(charge)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response({'error': 'Invalid data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def additional_charge_detail_view(request, charge_id):
+    """
+    PUT: Update an additional charge
+    DELETE: Delete an additional charge
+    """
+    from .models import AdditionalCharge
+    from .serializers import AdditionalChargeSerializer
+
+    try:
+        charge = AdditionalCharge.objects.get(id=charge_id)
+    except AdditionalCharge.DoesNotExist:
+        return Response({'error': 'Additional charge not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'PUT':
+        serializer = AdditionalChargeSerializer(charge, data=request.data, partial=True)
+        if serializer.is_valid():
+            updated_charge = serializer.save()
+            response_serializer = AdditionalChargeSerializer(updated_charge)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+        return Response({'error': 'Invalid data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        charge.delete()
+        return Response({'message': 'Additional charge deleted successfully'}, status=status.HTTP_200_OK)

@@ -14,4 +14,8 @@ urlpatterns = [
     path('expense-entries/', views.expense_entry_view, name='expense_entry_view'),
     path('expense-entries/<int:expense_id>/', views.expense_entry_detail_view, name='expense_entry_detail'),
     path('report/', views.financial_report_view, name='financial_report'),
+
+    # Additional charges (extra apportionment)
+    path('additional-charge/', views.additional_charge_view, name='additional_charge_view'),
+    path('additional-charge/<int:charge_id>/', views.additional_charge_detail_view, name='additional_charge_detail'),
 ]

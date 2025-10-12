@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     BudgetCategory, AnnualBudget, Expense, Revenue,
-    FinancialMainAccount, Collection, RevenueAccount, ExpenseEntry
+    FinancialMainAccount, Collection, RevenueAccount, ExpenseEntry, AdditionalCharge
 )
 
 
@@ -69,3 +69,12 @@ class ExpenseEntryAdmin(admin.ModelAdmin):
     search_fields = ['building__building_name', 'account_name', 'description']
     date_hierarchy = 'created_at'
     readonly_fields = ['is_outside_fiscal_period', 'created_at', 'updated_at']
+
+
+@admin.register(AdditionalCharge)
+class AdditionalChargeAdmin(admin.ModelAdmin):
+    list_display = ['building', 'name', 'total_amount', 'reference_month', 'active', 'created_at']
+    list_filter = ['active', 'building', 'reference_month']
+    search_fields = ['building__building_name', 'name', 'description']
+    date_hierarchy = 'created_at'
+    readonly_fields = ['created_at', 'updated_at']

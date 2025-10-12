@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     FinancialMainAccount, AnnualBudget, BudgetCategory, Expense, Collection,
-    RevenueAccount, ExpenseEntry
+    RevenueAccount, ExpenseEntry, AdditionalCharge
 )
 from building_mgmt.models import Building
 from datetime import datetime
@@ -211,6 +211,31 @@ class ExpenseEntrySerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return ExpenseEntry.objects.create(**validated_data)
+
+
+class AdditionalChargeSerializer(serializers.ModelSerializer):
+    """Serializer for creating and updating additional charges (extra apportionment)"""
+    buildingId = serializers.IntegerField(source='building_id')
+    totalAmount = serializers.DecimalField(source='total_amount', max_digits=12, decimal_places=2)
+    referenceMonth = serializers.CharField(source='reference_month')
+
+    class Meta:
+        model = AdditionalCharge
+        fields = ['id', 'buildingId', 'name', 'description', 'totalAmount',
+                 'referenceMonth', 'active', 'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'createdAt', 'updatedAt']
+
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    def create(self, validated_data):
+        return AdditionalCharge.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
 
 
 class FinancialReportSerializer(serializers.Serializer):

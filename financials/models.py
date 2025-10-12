@@ -221,3 +221,31 @@ class ExpenseEntry(models.Model):
                     self.reference_month > fiscal_end
                 )
         super().save(*args, **kwargs)
+
+
+class AdditionalCharge(models.Model):
+    """
+    Additional charges (extra apportionment) that are distributed across units.
+    These are special assessments or extraordinary charges that need to be
+    allocated in addition to regular condominium fees.
+    """
+    building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='additional_charges')
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    reference_month = models.CharField(max_length=7)  # Format: YYYY-MM
+    active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'financials_additional_charge'
+        ordering = ['-reference_month', '-created_at']
+        indexes = [
+            models.Index(fields=['building', 'reference_month']),
+            models.Index(fields=['active']),
+        ]
+
+    def __str__(self):
+        return f"{self.building.building_name} - {self.name} - {self.reference_month}"
