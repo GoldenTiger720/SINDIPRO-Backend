@@ -478,7 +478,7 @@ def calculate_fees_view(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        from buildings.models import Unit
+        from building_mgmt.models import Unit
         from .models import RevenueAccount, AdditionalCharge
         from decimal import Decimal
 
@@ -580,7 +580,7 @@ def validate_fractions_view(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        from buildings.models import Unit
+        from building_mgmt.models import Unit
 
         units = Unit.objects.filter(building_id=building_id)
 
