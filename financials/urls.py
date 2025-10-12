@@ -3,9 +3,11 @@ from . import views
 
 urlpatterns = [
     path('account/', views.financial_account_view, name='financial_account_view'),
+    path('account/<int:account_id>/', views.financial_account_detail_view, name='financial_account_detail'),
     path('annual/', views.annual_budget_view, name='annual_budget_view'),
     path('expense/', views.expense_view, name='expense_view'),
     path('collection/', views.collection_view, name='collection_view'),
+    path('collection/<int:collection_id>/', views.collection_detail_view, name='collection_detail'),
 
     # New comprehensive financial control system URLs
     path('revenue/', views.revenue_account_view, name='revenue_account_view'),

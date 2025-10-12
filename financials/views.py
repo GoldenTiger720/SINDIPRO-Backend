@@ -43,6 +43,32 @@ def financial_account_view(request):
             'details': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
 
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def financial_account_detail_view(request, account_id):
+    """
+    PUT: Update a financial account
+    DELETE: Delete a financial account
+    """
+    try:
+        account = FinancialMainAccount.objects.get(id=account_id)
+    except FinancialMainAccount.DoesNotExist:
+        return Response({'error': 'Financial account not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'PUT':
+        serializer = FinancialMainAccountSerializer(account, data=request.data, partial=True)
+        if serializer.is_valid():
+            updated_account = serializer.save()
+            response_serializer = FinancialMainAccountReadSerializer(updated_account)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+        return Response({'error': 'Invalid data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        account.delete()
+        return Response({'message': 'Financial account deleted successfully'}, status=status.HTTP_200_OK)
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def annual_budget_view(request):
@@ -179,6 +205,33 @@ def collection_view(request):
             'error': 'Invalid data',
             'details': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def collection_detail_view(request, collection_id):
+    """
+    PUT: Update a collection entry
+    DELETE: Delete a collection entry
+    """
+    try:
+        collection = Collection.objects.get(id=collection_id)
+    except Collection.DoesNotExist:
+        return Response({'error': 'Collection not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'PUT':
+        serializer = CollectionSerializer(collection, data=request.data, partial=True)
+        if serializer.is_valid():
+            updated_collection = serializer.save()
+            # Return the updated collection using the read serializer
+            response_serializer = CollectionReadSerializer(updated_collection)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+        return Response({'error': 'Invalid data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        collection.delete()
+        return Response({'message': 'Collection deleted successfully'}, status=status.HTTP_200_OK)
+
 
 # New views for comprehensive financial control system
 
