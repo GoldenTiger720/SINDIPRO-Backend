@@ -163,7 +163,8 @@ class CollectionReadSerializer(serializers.ModelSerializer):
 class RevenueAccountSerializer(serializers.ModelSerializer):
     """Serializer for creating and updating revenue accounts"""
     buildingId = serializers.IntegerField(source='building_id')
-    accountName = serializers.CharField(source='account_name')
+    accountId = serializers.IntegerField(source='account_id', write_only=True, required=True)
+    accountName = serializers.CharField(source='account_name', read_only=True)
     monthlyAmount = serializers.DecimalField(source='monthly_amount', max_digits=12, decimal_places=2)
     startMonth = serializers.CharField(source='start_month')
     endMonth = serializers.CharField(source='end_month')
@@ -173,18 +174,37 @@ class RevenueAccountSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RevenueAccount
-        fields = ['id', 'buildingId', 'accountName', 'monthlyAmount', 'startMonth',
+        fields = ['id', 'buildingId', 'accountId', 'accountName', 'monthlyAmount', 'startMonth',
                  'endMonth', 'fiscalYearStart', 'fiscalYearEnd', 'isExtended',
                  'createdAt', 'updatedAt']
-        read_only_fields = ['id', 'isExtended', 'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'accountName', 'isExtended', 'createdAt', 'updatedAt']
 
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
 
+    def validate_accountId(self, value):
+        """Validate that the account exists"""
+        try:
+            FinancialMainAccount.objects.get(id=value)
+        except FinancialMainAccount.DoesNotExist:
+            raise serializers.ValidationError('Invalid account ID')
+        return value
+
     def create(self, validated_data):
+        # Get the account to populate account_name
+        account_id = validated_data.get('account_id')
+        account = FinancialMainAccount.objects.get(id=account_id)
+        validated_data['account_name'] = f"{account.code} - {account.name}"
+
         return RevenueAccount.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
+        # If account_id is being updated, update account_name as well
+        account_id = validated_data.get('account_id')
+        if account_id:
+            account = FinancialMainAccount.objects.get(id=account_id)
+            validated_data['account_name'] = f"{account.code} - {account.name}"
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()

@@ -146,7 +146,8 @@ class RevenueAccount(models.Model):
     Each account has a fixed amount that repeats for the defined period.
     """
     building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='revenue_accounts')
-    account_name = models.CharField(max_length=200)
+    account = models.ForeignKey(FinancialMainAccount, on_delete=models.CASCADE, related_name='revenue_accounts', null=True, blank=True)
+    account_name = models.CharField(max_length=200)  # Denormalized for display purposes
     monthly_amount = models.DecimalField(max_digits=12, decimal_places=2)
 
     # Period configuration
