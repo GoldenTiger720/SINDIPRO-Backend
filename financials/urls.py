@@ -20,4 +20,8 @@ urlpatterns = [
     # Additional charges (extra apportionment)
     path('additional-charge/', views.additional_charge_view, name='additional_charge_view'),
     path('additional-charge/<int:charge_id>/', views.additional_charge_detail_view, name='additional_charge_detail'),
+
+    # Fee calculation and validation
+    path('calculate-fees/', views.calculate_fees_view, name='calculate_fees'),
+    path('validate-fractions/', views.validate_fractions_view, name='validate_fractions'),
 ]

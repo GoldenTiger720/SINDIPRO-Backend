@@ -458,3 +458,150 @@ def additional_charge_detail_view(request, charge_id):
     elif request.method == 'DELETE':
         charge.delete()
         return Response({'message': 'Additional charge deleted successfully'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def calculate_fees_view(request):
+    """
+    GET: Calculate fees for all units in a building
+         Query parameters:
+         - building_id (required)
+         - reference_month (required, format: YYYY-MM)
+    """
+    building_id = request.GET.get('building_id')
+    reference_month = request.GET.get('reference_month')
+
+    if not building_id or not reference_month:
+        return Response({
+            'error': 'building_id and reference_month are required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        from buildings.models import Unit
+        from .models import RevenueAccount, AdditionalCharge
+        from decimal import Decimal
+
+        # Get all units for the building
+        units = Unit.objects.filter(building_id=building_id).select_related('building')
+
+        if not units.exists():
+            return Response({
+                'error': 'No units found for this building'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # Calculate total ideal fraction
+        total_ideal_fraction = sum(float(unit.ideal_fraction) for unit in units)
+        is_fraction_valid = abs(total_ideal_fraction - 1.0) < 0.0001  # Allow small floating point errors
+
+        # Get revenue accounts for the building and reference month
+        revenue_accounts = RevenueAccount.objects.filter(
+            building_id=building_id
+        )
+
+        # Calculate total regular budget from revenue accounts
+        total_regular_budget = Decimal('0.00')
+        for revenue in revenue_accounts:
+            # Check if the reference month is within the revenue period
+            if revenue.start_month <= reference_month <= revenue.end_month:
+                total_regular_budget += revenue.monthly_amount
+
+        # Get active additional charges for the reference month
+        additional_charges = AdditionalCharge.objects.filter(
+            building_id=building_id,
+            reference_month=reference_month,
+            active=True
+        )
+
+        total_additional_charges = sum(charge.total_amount for charge in additional_charges)
+
+        # Calculate total monthly collection
+        total_monthly_collection = total_regular_budget + total_additional_charges
+
+        # Calculate fees for each unit
+        unit_fees = []
+        for unit in units:
+            ideal_fraction = float(unit.ideal_fraction)
+
+            # Calculate regular fee
+            regular_fee = float(total_regular_budget) * ideal_fraction
+
+            # Calculate additional fee
+            additional_fee = float(total_additional_charges) * ideal_fraction
+
+            # Calculate total fee
+            total_fee = regular_fee + additional_fee
+
+            unit_fees.append({
+                'unitId': unit.id,
+                'unitNumber': unit.number,
+                'ownerName': unit.owner or '',
+                'idealFraction': ideal_fraction,
+                'regularFee': round(regular_fee, 2),
+                'additionalFee': round(additional_fee, 2),
+                'totalFee': round(total_fee, 2)
+            })
+
+        response_data = {
+            'buildingId': int(building_id),
+            'referenceMonth': reference_month,
+            'totalRegularBudget': float(total_regular_budget),
+            'totalAdditionalCharges': float(total_additional_charges),
+            'totalMonthlyCollection': float(total_monthly_collection),
+            'totalIdealFraction': total_ideal_fraction,
+            'isIdealFractionValid': is_fraction_valid,
+            'unitFees': unit_fees
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            'error': 'Failed to calculate fees',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def validate_fractions_view(request):
+    """
+    GET: Validate ideal fractions for a building
+         Query parameter: building_id (required)
+    """
+    building_id = request.GET.get('building_id')
+
+    if not building_id:
+        return Response({
+            'error': 'building_id is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        from buildings.models import Unit
+
+        units = Unit.objects.filter(building_id=building_id)
+
+        if not units.exists():
+            return Response({
+                'isValid': True,
+                'totalFraction': 0.0,
+                'unitCount': 0
+            }, status=status.HTTP_200_OK)
+
+        # Calculate total ideal fraction
+        total_fraction = sum(float(unit.ideal_fraction) for unit in units)
+
+        # Check if total is approximately 1.0 (100%)
+        is_valid = abs(total_fraction - 1.0) < 0.0001  # Allow small floating point errors
+
+        return Response({
+            'isValid': is_valid,
+            'totalFraction': round(total_fraction, 6),
+            'unitCount': units.count()
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            'error': 'Failed to validate ideal fractions',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
