@@ -151,12 +151,12 @@ class RevenueAccount(models.Model):
     monthly_amount = models.DecimalField(max_digits=12, decimal_places=2)
 
     # Period configuration
-    start_month = models.CharField(max_length=7)  # Format: YYYY-MM
-    end_month = models.CharField(max_length=7)    # Format: YYYY-MM
+    start_month = models.CharField(max_length=7)  # Format: YYYY (year only)
+    end_month = models.CharField(max_length=7)    # Format: YYYY (year only)
 
     # Fiscal year tracking
-    fiscal_year_start = models.CharField(max_length=7)  # Format: YYYY-MM
-    fiscal_year_end = models.CharField(max_length=7)    # Format: YYYY-MM
+    fiscal_year_start = models.CharField(max_length=7)  # Format: YYYY (year only)
+    fiscal_year_end = models.CharField(max_length=7)    # Format: YYYY (year only)
 
     # Extension tracking
     is_extended = models.BooleanField(default=False)
