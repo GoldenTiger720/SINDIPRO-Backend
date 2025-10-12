@@ -179,3 +179,160 @@ def collection_view(request):
             'error': 'Invalid data',
             'details': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
+
+# New views for comprehensive financial control system
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def revenue_account_view(request):
+    """
+    GET: Retrieve revenue accounts
+         Query parameter: building_id (required)
+    POST: Create a new revenue account
+    """
+    if request.method == 'GET':
+        building_id = request.GET.get('building_id')
+        if not building_id:
+            return Response({'error': 'building_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .models import RevenueAccount
+        from .serializers import RevenueAccountSerializer
+
+        revenues = RevenueAccount.objects.filter(building_id=building_id).order_by('-created_at')
+        serializer = RevenueAccountSerializer(revenues, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        from .serializers import RevenueAccountSerializer
+
+        serializer = RevenueAccountSerializer(data=request.data)
+        if serializer.is_valid():
+            revenue = serializer.save()
+            response_serializer = RevenueAccountSerializer(revenue)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response({'error': 'Invalid data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def revenue_account_detail_view(request, revenue_id):
+    """
+    DELETE: Delete a revenue account
+    """
+    from .models import RevenueAccount
+
+    try:
+        revenue = RevenueAccount.objects.get(id=revenue_id)
+        revenue.delete()
+        return Response({'message': 'Revenue account deleted successfully'}, status=status.HTTP_200_OK)
+    except RevenueAccount.DoesNotExist:
+        return Response({'error': 'Revenue account not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def extend_revenue_view(request, revenue_id):
+    """
+    POST: Extend revenue validity period
+    Expected data: {"extend_to_month": "YYYY-MM"}
+    """
+    from .models import RevenueAccount
+
+    try:
+        revenue = RevenueAccount.objects.get(id=revenue_id)
+        extend_to_month = request.data.get('extend_to_month')
+
+        if not extend_to_month:
+            return Response({'error': 'extend_to_month is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Extend the end_month and mark as extended
+        revenue.end_month = extend_to_month
+        revenue.is_extended = True
+        revenue.save()
+
+        from .serializers import RevenueAccountSerializer
+        serializer = RevenueAccountSerializer(revenue)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except RevenueAccount.DoesNotExist:
+        return Response({'error': 'Revenue account not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def expense_entry_view(request):
+    """
+    GET: Retrieve expense entries
+         Query parameter: building_id (required)
+    POST: Create a new expense entry
+    """
+    if request.method == 'GET':
+        building_id = request.GET.get('building_id')
+        if not building_id:
+            return Response({'error': 'building_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .models import ExpenseEntry
+        from .serializers import ExpenseEntrySerializer
+
+        expenses = ExpenseEntry.objects.filter(building_id=building_id).order_by('-reference_month', '-created_at')
+        serializer = ExpenseEntrySerializer(expenses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        from .serializers import ExpenseEntrySerializer
+
+        serializer = ExpenseEntrySerializer(data=request.data)
+        if serializer.is_valid():
+            expense = serializer.save()
+            response_serializer = ExpenseEntrySerializer(expense)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response({'error': 'Invalid data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def expense_entry_detail_view(request, expense_id):
+    """
+    DELETE: Delete an expense entry
+    """
+    from .models import ExpenseEntry
+
+    try:
+        expense = ExpenseEntry.objects.get(id=expense_id)
+        expense.delete()
+        return Response({'message': 'Expense entry deleted successfully'}, status=status.HTTP_200_OK)
+    except ExpenseEntry.DoesNotExist:
+        return Response({'error': 'Expense entry not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def financial_report_view(request):
+    """
+    GET: Generate financial report
+         Query parameters:
+         - building_id (required)
+         - fiscal_year_start (required, format: YYYY-MM)
+         - fiscal_year_end (required, format: YYYY-MM)
+    """
+    building_id = request.GET.get('building_id')
+    fiscal_year_start = request.GET.get('fiscal_year_start')
+    fiscal_year_end = request.GET.get('fiscal_year_end')
+
+    if not all([building_id, fiscal_year_start, fiscal_year_end]):
+        return Response({
+            'error': 'building_id, fiscal_year_start, and fiscal_year_end are required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    from .serializers import FinancialReportSerializer
+
+    data = {
+        'building_id': int(building_id),
+        'fiscal_year_start': fiscal_year_start,
+        'fiscal_year_end': fiscal_year_end
+    }
+
+    serializer = FinancialReportSerializer(data)
+    return Response(serializer.to_representation(data), status=status.HTTP_200_OK)

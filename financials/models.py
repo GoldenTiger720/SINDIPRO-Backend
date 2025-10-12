@@ -125,14 +125,99 @@ class Collection(models.Model):
     monthly_amount = models.DecimalField(max_digits=12, decimal_places=2)
     start_date = models.DateField()
     active = models.BooleanField(default=True)
-    
+
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         db_table = 'financials_collection'
         ordering = ['-start_date']
-    
+
     def __str__(self):
         return f"{self.building.building_name} - {self.name} - {self.monthly_amount}"
+
+
+# New models for comprehensive financial control system
+
+class RevenueAccount(models.Model):
+    """
+    Fixed monthly revenue account with automatic repetition.
+    Each account has a fixed amount that repeats for the defined period.
+    """
+    building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='revenue_accounts')
+    account_name = models.CharField(max_length=200)
+    monthly_amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # Period configuration
+    start_month = models.CharField(max_length=7)  # Format: YYYY-MM
+    end_month = models.CharField(max_length=7)    # Format: YYYY-MM
+
+    # Fiscal year tracking
+    fiscal_year_start = models.CharField(max_length=7)  # Format: YYYY-MM
+    fiscal_year_end = models.CharField(max_length=7)    # Format: YYYY-MM
+
+    # Extension tracking
+    is_extended = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'financials_revenue_account'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.building.building_name} - {self.account_name} - R$ {self.monthly_amount}"
+
+
+class ExpenseEntry(models.Model):
+    """
+    Monthly expense entries assigned to one of the five parent accounts.
+    Expenses are recorded as they are actually incurred.
+    """
+    PARENT_ACCOUNT_CHOICES = [
+        ('personnel_and_charges', 'Personnel and Charges'),
+        ('fees_and_public_taxes', 'Fees and Public Taxes'),
+        ('contracts', 'Contracts'),
+        ('maintenance', 'Maintenance'),
+        ('miscellaneous', 'Miscellaneous'),
+    ]
+
+    building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='expense_entries')
+    parent_account = models.CharField(max_length=30, choices=PARENT_ACCOUNT_CHOICES)
+    account_name = models.CharField(max_length=200)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    reference_month = models.CharField(max_length=7)  # Format: YYYY-MM
+    description = models.TextField(blank=True)
+
+    # Track if expense is outside fiscal period
+    is_outside_fiscal_period = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'financials_expense_entry'
+        ordering = ['-reference_month', '-created_at']
+        indexes = [
+            models.Index(fields=['building', 'reference_month']),
+            models.Index(fields=['parent_account']),
+        ]
+
+    def __str__(self):
+        return f"{self.building.building_name} - {self.account_name} - {self.reference_month}"
+
+    def save(self, *args, **kwargs):
+        # Auto-detect if expense is outside fiscal period
+        if self.building:
+            revenue_accounts = self.building.revenue_accounts.all()
+            if revenue_accounts.exists():
+                # Get the fiscal period from any revenue account
+                fiscal_start = revenue_accounts.first().fiscal_year_start
+                fiscal_end = revenue_accounts.first().fiscal_year_end
+                self.is_outside_fiscal_period = (
+                    self.reference_month < fiscal_start or
+                    self.reference_month > fiscal_end
+                )
+        super().save(*args, **kwargs)

@@ -1,7 +1,13 @@
 from rest_framework import serializers
-from .models import FinancialMainAccount, AnnualBudget, BudgetCategory, Expense, Collection
+from .models import (
+    FinancialMainAccount, AnnualBudget, BudgetCategory, Expense, Collection,
+    RevenueAccount, ExpenseEntry
+)
 from building_mgmt.models import Building
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from collections import defaultdict
+from decimal import Decimal
 
 class BuildingInfoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -145,8 +151,159 @@ class CollectionReadSerializer(serializers.ModelSerializer):
     building = BuildingInfoSerializer(read_only=True)
     monthlyAmount = serializers.DecimalField(source='monthly_amount', max_digits=12, decimal_places=2, read_only=True)
     startDate = serializers.DateField(source='start_date', read_only=True)
-    
+
     class Meta:
         model = Collection
-        fields = ['id', 'building', 'name', 'purpose', 'monthlyAmount', 'startDate', 'active', 
+        fields = ['id', 'building', 'name', 'purpose', 'monthlyAmount', 'startDate', 'active',
                  'created_at', 'updated_at']
+
+
+# New serializers for comprehensive financial control system
+
+class RevenueAccountSerializer(serializers.ModelSerializer):
+    """Serializer for creating and updating revenue accounts"""
+    buildingId = serializers.IntegerField(source='building_id')
+    accountName = serializers.CharField(source='account_name')
+    monthlyAmount = serializers.DecimalField(source='monthly_amount', max_digits=12, decimal_places=2)
+    startMonth = serializers.CharField(source='start_month')
+    endMonth = serializers.CharField(source='end_month')
+    fiscalYearStart = serializers.CharField(source='fiscal_year_start')
+    fiscalYearEnd = serializers.CharField(source='fiscal_year_end')
+    isExtended = serializers.BooleanField(source='is_extended', read_only=True)
+
+    class Meta:
+        model = RevenueAccount
+        fields = ['id', 'buildingId', 'accountName', 'monthlyAmount', 'startMonth',
+                 'endMonth', 'fiscalYearStart', 'fiscalYearEnd', 'isExtended',
+                 'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'isExtended', 'createdAt', 'updatedAt']
+
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    def create(self, validated_data):
+        return RevenueAccount.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class ExpenseEntrySerializer(serializers.ModelSerializer):
+    """Serializer for creating and updating expense entries"""
+    buildingId = serializers.IntegerField(source='building_id')
+    parentAccount = serializers.ChoiceField(source='parent_account', choices=ExpenseEntry.PARENT_ACCOUNT_CHOICES)
+    accountName = serializers.CharField(source='account_name')
+    referenceMonth = serializers.CharField(source='reference_month')
+    isOutsideFiscalPeriod = serializers.BooleanField(source='is_outside_fiscal_period', read_only=True)
+
+    class Meta:
+        model = ExpenseEntry
+        fields = ['id', 'buildingId', 'parentAccount', 'accountName', 'amount',
+                 'referenceMonth', 'description', 'isOutsideFiscalPeriod',
+                 'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'isOutsideFiscalPeriod', 'createdAt', 'updatedAt']
+
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    def create(self, validated_data):
+        return ExpenseEntry.objects.create(**validated_data)
+
+
+class FinancialReportSerializer(serializers.Serializer):
+    """Serializer for financial report data aggregation"""
+    buildingId = serializers.IntegerField()
+    referenceMonth = serializers.CharField()
+    fiscalYearStart = serializers.CharField()
+    fiscalYearEnd = serializers.CharField()
+    totalPlannedRevenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    totalActualExpenses = serializers.DecimalField(max_digits=12, decimal_places=2)
+    monthlyData = serializers.ListField()
+
+    def to_representation(self, instance):
+        """Generate financial report data"""
+        building_id = instance.get('building_id')
+        fiscal_year_start = instance.get('fiscal_year_start')
+        fiscal_year_end = instance.get('fiscal_year_end')
+
+        # Get all revenue accounts for this building
+        revenue_accounts = RevenueAccount.objects.filter(building_id=building_id)
+
+        # Get all expense entries for this building
+        expense_entries = ExpenseEntry.objects.filter(building_id=building_id)
+
+        # Generate list of months in the period
+        start_date = datetime.strptime(fiscal_year_start, '%Y-%m')
+        end_date = datetime.strptime(fiscal_year_end, '%Y-%m')
+
+        # Include extended months from revenue accounts
+        for revenue in revenue_accounts:
+            revenue_end = datetime.strptime(revenue.end_month, '%Y-%m')
+            if revenue_end > end_date:
+                end_date = revenue_end
+
+        months = []
+        current = start_date
+        while current <= end_date:
+            months.append(current.strftime('%Y-%m'))
+            current += relativedelta(months=1)
+
+        # Aggregate data by month
+        monthly_data = []
+        total_revenue = Decimal('0')
+        total_expenses = Decimal('0')
+
+        for month in months:
+            # Calculate revenue for this month
+            month_revenue = Decimal('0')
+            revenue_by_account = []
+
+            for revenue in revenue_accounts:
+                if revenue.start_month <= month <= revenue.end_month:
+                    month_revenue += revenue.monthly_amount
+                    revenue_by_account.append({
+                        'accountName': revenue.account_name,
+                        'amount': float(revenue.monthly_amount)
+                    })
+
+            # Calculate expenses by parent account for this month
+            expenses_by_parent = defaultdict(Decimal)
+            month_expenses_entries = expense_entries.filter(reference_month=month)
+
+            for expense in month_expenses_entries:
+                expenses_by_parent[expense.parent_account] += expense.amount
+
+            month_expenses = sum(expenses_by_parent.values())
+
+            # Check if month is outside fiscal period
+            is_outside = month < fiscal_year_start or month > fiscal_year_end
+
+            monthly_data.append({
+                'month': month,
+                'totalRevenue': float(month_revenue),
+                'totalExpenses': float(month_expenses),
+                'isOutsideFiscalPeriod': is_outside,
+                'expensesByParent': {
+                    'personnel_and_charges': float(expenses_by_parent.get('personnel_and_charges', Decimal('0'))),
+                    'fees_and_public_taxes': float(expenses_by_parent.get('fees_and_public_taxes', Decimal('0'))),
+                    'contracts': float(expenses_by_parent.get('contracts', Decimal('0'))),
+                    'maintenance': float(expenses_by_parent.get('maintenance', Decimal('0'))),
+                    'miscellaneous': float(expenses_by_parent.get('miscellaneous', Decimal('0'))),
+                },
+                'revenueByAccount': revenue_by_account
+            })
+
+            total_revenue += month_revenue
+            total_expenses += month_expenses
+
+        return {
+            'buildingId': building_id,
+            'fiscalYearStart': fiscal_year_start,
+            'fiscalYearEnd': fiscal_year_end,
+            'totalPlannedRevenue': float(total_revenue),
+            'totalActualExpenses': float(total_expenses),
+            'monthlyData': monthly_data
+        }
