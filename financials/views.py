@@ -502,8 +502,11 @@ def calculate_fees_view(request):
         # Calculate total regular budget from revenue accounts
         total_regular_budget = Decimal('0.00')
         for revenue in revenue_accounts:
-            # Check if the reference month is within the revenue period
-            if revenue.start_month <= reference_month <= revenue.end_month:
+            # Extract year from reference_month (YYYY-MM format)
+            reference_year = reference_month[:4]
+
+            # Check if the reference year is within the revenue period (years are stored as YYYY)
+            if revenue.start_month <= reference_year <= revenue.end_month:
                 total_regular_budget += revenue.monthly_amount
 
         # Get active additional charges for the reference month
