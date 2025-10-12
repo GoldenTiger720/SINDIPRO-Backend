@@ -99,7 +99,7 @@ class FinancialMainAccount(models.Model):
         ('sub', 'Sub Account'),
         ('detailed', 'Detailed Account'),
     ]
-    
+
     building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='financial_accounts')
     code = models.CharField(max_length=20)
     name = models.CharField(max_length=200)
@@ -107,14 +107,19 @@ class FinancialMainAccount(models.Model):
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='sub_accounts')
     expected_amount = models.DecimalField(max_digits=12, decimal_places=2)
     actual_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    
+
+    # New fields for assembly period and fiscal year
+    assembly_start_date = models.DateField(null=True, blank=True)
+    assembly_end_date = models.DateField(null=True, blank=True)
+    fiscal_year = models.IntegerField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         unique_together = ('building', 'code')
         db_table = 'financials_main_account'
-    
+
     def __str__(self):
         return f"{self.building.building_name} - {self.code} - {self.name}"
 
