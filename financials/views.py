@@ -609,3 +609,77 @@ def validate_fractions_view(request):
             'error': 'Failed to validate ideal fractions',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def account_balance_view(request):
+    """
+    GET: Retrieve account balances
+         Query parameters:
+         - building_id (required)
+         - reference_month (optional)
+         - account_id (optional)
+    POST: Create a new account balance
+    """
+    if request.method == 'GET':
+        building_id = request.GET.get('building_id')
+        if not building_id:
+            return Response({'error': 'building_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .models import AccountBalance
+        from .serializers import AccountBalanceSerializer
+
+        balances = AccountBalance.objects.filter(building_id=building_id).select_related('account')
+
+        # Optional filters
+        reference_month = request.GET.get('reference_month')
+        if reference_month:
+            balances = balances.filter(reference_month=reference_month)
+
+        account_id = request.GET.get('account_id')
+        if account_id:
+            balances = balances.filter(account_id=account_id)
+
+        balances = balances.order_by('-reference_month', 'account__code')
+        serializer = AccountBalanceSerializer(balances, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        from .serializers import AccountBalanceSerializer
+
+        serializer = AccountBalanceSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            balance = serializer.save()
+            response_serializer = AccountBalanceSerializer(balance)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response({'error': 'Invalid data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def account_balance_detail_view(request, balance_id):
+    """
+    PUT: Update an account balance
+    DELETE: Delete an account balance
+    """
+    from .models import AccountBalance
+    from .serializers import AccountBalanceSerializer
+
+    try:
+        balance = AccountBalance.objects.get(id=balance_id)
+    except AccountBalance.DoesNotExist:
+        return Response({'error': 'Account balance not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'PUT':
+        serializer = AccountBalanceSerializer(balance, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            updated_balance = serializer.save()
+            response_serializer = AccountBalanceSerializer(updated_balance)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+        return Response({'error': 'Invalid data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        balance.delete()
+        return Response({'message': 'Account balance deleted successfully'}, status=status.HTTP_200_OK)

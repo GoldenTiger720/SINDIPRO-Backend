@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     FinancialMainAccount, AnnualBudget, BudgetCategory, Expense, Collection,
-    RevenueAccount, ExpenseEntry, AdditionalCharge
+    RevenueAccount, ExpenseEntry, AdditionalCharge, AccountBalance
 )
 from building_mgmt.models import Building
 from datetime import datetime
@@ -261,6 +261,44 @@ class AdditionalChargeSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return AdditionalCharge.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+class AccountBalanceSerializer(serializers.ModelSerializer):
+    """Serializer for creating and updating account balances"""
+    buildingId = serializers.IntegerField(source='building_id')
+    accountId = serializers.IntegerField(source='account_id')
+    accountName = serializers.CharField(source='account.name', read_only=True)
+    accountCode = serializers.CharField(source='account.code', read_only=True)
+    referenceMonth = serializers.CharField(source='reference_month')
+
+    class Meta:
+        model = AccountBalance
+        fields = ['id', 'buildingId', 'accountId', 'accountName', 'accountCode',
+                 'referenceMonth', 'balance', 'notes', 'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'accountName', 'accountCode', 'createdAt', 'updatedAt']
+
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    def validate_accountId(self, value):
+        """Validate that the account exists and is a main account"""
+        try:
+            account = FinancialMainAccount.objects.get(id=value)
+            if account.type != 'main':
+                raise serializers.ValidationError('Only main accounts can have balances')
+        except FinancialMainAccount.DoesNotExist:
+            raise serializers.ValidationError('Invalid account ID')
+        return value
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context.get('request').user if self.context.get('request') else None
+        return AccountBalance.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():

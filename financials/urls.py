@@ -24,4 +24,8 @@ urlpatterns = [
     # Fee calculation and validation
     path('calculate-fees/', views.calculate_fees_view, name='calculate_fees'),
     path('validate-fractions/', views.validate_fractions_view, name='validate_fractions'),
+
+    # Account balances
+    path('account-balance/', views.account_balance_view, name='account_balance_view'),
+    path('account-balance/<int:balance_id>/', views.account_balance_detail_view, name='account_balance_detail'),
 ]
