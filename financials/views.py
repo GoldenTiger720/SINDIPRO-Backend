@@ -188,7 +188,7 @@ def collection_view(request):
     
     elif request.method == 'POST':
         serializer = CollectionSerializer(data=request.data, context={'request': request})
-        
+
         if serializer.is_valid():
             collection = serializer.save()
             return Response({
@@ -196,11 +196,12 @@ def collection_view(request):
                 'collection_id': collection.id,
                 'name': collection.name,
                 'monthly_amount': str(collection.monthly_amount),
-                'start_date': collection.start_date.strftime('%Y-%m-%d'),
+                'start_date': collection.start_date,  # start_date is already a string (YYYY-MM format)
+                'end_date': collection.end_date,  # end_date is also a string
                 'building_id': collection.building_id,
                 'active': collection.active
             }, status=status.HTTP_201_CREATED)
-        
+
         return Response({
             'error': 'Invalid data',
             'details': serializer.errors

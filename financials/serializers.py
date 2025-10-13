@@ -136,12 +136,13 @@ class AnnualBudgetReadSerializer(serializers.ModelSerializer):
 class CollectionSerializer(serializers.ModelSerializer):
     buildingId = serializers.IntegerField(source='building_id')
     monthlyAmount = serializers.DecimalField(source='monthly_amount', max_digits=12, decimal_places=2)
-    startDate = serializers.DateField(source='start_date')
-    
+    startDate = serializers.CharField(source='start_date')  # Changed to CharField for YYYY-MM format
+    endDate = serializers.CharField(source='end_date', required=False, allow_null=True)  # Added endDate field
+
     class Meta:
         model = Collection
-        fields = ['buildingId', 'name', 'purpose', 'monthlyAmount', 'startDate', 'active']
-        
+        fields = ['buildingId', 'name', 'purpose', 'monthlyAmount', 'startDate', 'endDate', 'active']
+
     def create(self, validated_data):
         collection = Collection.objects.create(
             building_id=validated_data['building_id'],
@@ -149,20 +150,22 @@ class CollectionSerializer(serializers.ModelSerializer):
             purpose=validated_data['purpose'],
             monthly_amount=validated_data['monthly_amount'],
             start_date=validated_data['start_date'],
+            end_date=validated_data.get('end_date'),
             active=validated_data['active'],
             created_by=self.context.get('request').user if self.context.get('request') else None
         )
-        
+
         return collection
 
 class CollectionReadSerializer(serializers.ModelSerializer):
     building = BuildingInfoSerializer(read_only=True)
     monthlyAmount = serializers.DecimalField(source='monthly_amount', max_digits=12, decimal_places=2, read_only=True)
-    startDate = serializers.DateField(source='start_date', read_only=True)
+    startDate = serializers.CharField(source='start_date', read_only=True)
+    endDate = serializers.CharField(source='end_date', read_only=True)
 
     class Meta:
         model = Collection
-        fields = ['id', 'building', 'name', 'purpose', 'monthlyAmount', 'startDate', 'active',
+        fields = ['id', 'building', 'name', 'purpose', 'monthlyAmount', 'startDate', 'endDate', 'active',
                  'created_at', 'updated_at']
 
 

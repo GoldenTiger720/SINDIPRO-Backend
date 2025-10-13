@@ -128,7 +128,8 @@ class Collection(models.Model):
     name = models.CharField(max_length=200)
     purpose = models.TextField()
     monthly_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    start_date = models.DateField()
+    start_date = models.CharField(max_length=7)  # Format: YYYY-MM (start month)
+    end_date = models.CharField(max_length=7, null=True, blank=True)  # Format: YYYY-MM (end month)
     active = models.BooleanField(default=True)
 
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)

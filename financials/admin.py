@@ -45,10 +45,10 @@ class FinancialMainAccountAdmin(admin.ModelAdmin):
 
 @admin.register(Collection)
 class CollectionAdmin(admin.ModelAdmin):
-    list_display = ['building', 'name', 'monthly_amount', 'start_date', 'active', 'created_at']
-    list_filter = ['active', 'building', 'start_date']
+    list_display = ['building', 'name', 'monthly_amount', 'start_date', 'end_date', 'active', 'created_at']
+    list_filter = ['active', 'building']
     search_fields = ['building__building_name', 'name', 'purpose']
-    date_hierarchy = 'start_date'
+    date_hierarchy = 'created_at'
 
 
 @admin.register(RevenueAccount)
