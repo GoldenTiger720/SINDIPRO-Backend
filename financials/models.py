@@ -263,10 +263,18 @@ class AccountBalance(models.Model):
     Monthly account balances for main accounts.
     At the end of each closed month, record the current balance for each account.
     """
+    BALANCE_TYPE_CHOICES = [
+        ('ordinary', 'Ordinary'),
+        ('extraordinary', 'Extraordinary'),
+    ]
+
     building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='account_balances')
     account = models.ForeignKey(FinancialMainAccount, on_delete=models.CASCADE, related_name='balances')
     reference_month = models.CharField(max_length=7)  # Format: YYYY-MM
     balance = models.DecimalField(max_digits=12, decimal_places=2)
+    delinquency = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # Pending amounts not yet paid
+    balance_type = models.CharField(max_length=20, choices=BALANCE_TYPE_CHOICES, default='ordinary')
+    balance_name = models.CharField(max_length=200, blank=True)  # Required only for extraordinary balances
     notes = models.TextField(blank=True)
 
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
@@ -280,6 +288,7 @@ class AccountBalance(models.Model):
         indexes = [
             models.Index(fields=['building', 'reference_month']),
             models.Index(fields=['account', 'reference_month']),
+            models.Index(fields=['balance_type']),
         ]
 
     def __str__(self):
