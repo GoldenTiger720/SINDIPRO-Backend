@@ -630,7 +630,7 @@ def account_balance_view(request):
         from .models import AccountBalance
         from .serializers import AccountBalanceSerializer
 
-        balances = AccountBalance.objects.filter(building_id=building_id).select_related('account')
+        balances = AccountBalance.objects.filter(building_id=building_id)
 
         # Optional filters
         reference_month = request.GET.get('reference_month')
@@ -641,7 +641,7 @@ def account_balance_view(request):
         if account_id:
             balances = balances.filter(account_id=account_id)
 
-        balances = balances.order_by('-reference_month', 'account__code')
+        balances = balances.order_by('-reference_month', 'account_name')
         serializer = AccountBalanceSerializer(balances, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

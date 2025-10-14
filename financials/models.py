@@ -269,13 +269,12 @@ class AccountBalance(models.Model):
     ]
 
     building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='account_balances')
-    account = models.ForeignKey(FinancialMainAccount, on_delete=models.CASCADE, related_name='balances')
+    account_name = models.CharField(max_length=200)  # Manual account name input
     reference_month = models.CharField(max_length=7)  # Format: YYYY-MM
     balance = models.DecimalField(max_digits=12, decimal_places=2)
     delinquency = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # Pending amounts not yet paid
     balance_type = models.CharField(max_length=20, choices=BALANCE_TYPE_CHOICES, default='ordinary')
     balance_name = models.CharField(max_length=200, blank=True)  # Required only for extraordinary balances
-    notes = models.TextField(blank=True)
 
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -284,12 +283,10 @@ class AccountBalance(models.Model):
     class Meta:
         db_table = 'financials_account_balance'
         ordering = ['-reference_month', '-created_at']
-        unique_together = ('building', 'account', 'reference_month')
         indexes = [
             models.Index(fields=['building', 'reference_month']),
-            models.Index(fields=['account', 'reference_month']),
             models.Index(fields=['balance_type']),
         ]
 
     def __str__(self):
-        return f"{self.building.building_name} - {self.account.name} - {self.reference_month}: R$ {self.balance}"
+        return f"{self.building.building_name} - {self.account_name} - {self.reference_month}: R$ {self.balance}"

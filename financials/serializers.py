@@ -272,18 +272,16 @@ class AdditionalChargeSerializer(serializers.ModelSerializer):
 class AccountBalanceSerializer(serializers.ModelSerializer):
     """Serializer for creating and updating account balances"""
     buildingId = serializers.IntegerField(source='building_id')
-    accountId = serializers.IntegerField(source='account_id')
-    accountName = serializers.CharField(source='account.name', read_only=True)
-    accountCode = serializers.CharField(source='account.code', read_only=True)
+    accountName = serializers.CharField(source='account_name')
     referenceMonth = serializers.CharField(source='reference_month')
     balanceType = serializers.ChoiceField(source='balance_type', choices=AccountBalance.BALANCE_TYPE_CHOICES, default='ordinary')
     balanceName = serializers.CharField(source='balance_name', required=False, allow_blank=True)
 
     class Meta:
         model = AccountBalance
-        fields = ['id', 'buildingId', 'accountId', 'accountName', 'accountCode',
+        fields = ['id', 'buildingId', 'accountName',
                  'referenceMonth', 'balance', 'delinquency', 'balanceType', 'balanceName', 'createdAt', 'updatedAt']
-        read_only_fields = ['id', 'accountName', 'accountCode', 'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'createdAt', 'updatedAt']
 
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
@@ -299,16 +297,6 @@ class AccountBalanceSerializer(serializers.ModelSerializer):
             })
 
         return data
-
-    def validate_accountId(self, value):
-        """Validate that the account exists and is a main account"""
-        try:
-            account = FinancialMainAccount.objects.get(id=value)
-            if account.type != 'main':
-                raise serializers.ValidationError('Only main accounts can have balances')
-        except FinancialMainAccount.DoesNotExist:
-            raise serializers.ValidationError('Invalid account ID')
-        return value
 
     def create(self, validated_data):
         validated_data['created_by'] = self.context.get('request').user if self.context.get('request') else None
