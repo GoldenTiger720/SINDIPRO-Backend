@@ -2,5 +2,6 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # API endpoints will be added here
+    # User management endpoints
+    path('<int:pk>/', views.UserUpdateDestroyView.as_view(), name='user-update-destroy'),
 ]

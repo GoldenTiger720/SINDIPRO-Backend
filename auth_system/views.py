@@ -113,9 +113,10 @@ class UserListView(generics.ListAPIView):
 
     def get_queryset(self):
         # Only users with appropriate permissions can view user list
+        # Filter out superusers (is_superuser=False)
         if self.request.user.role in ['master', 'manager']:
-            return User.objects.all()
-        return User.objects.filter(id=self.request.user.id)
+            return User.objects.filter(is_superuser=False)
+        return User.objects.filter(id=self.request.user.id, is_superuser=False)
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
