@@ -100,6 +100,11 @@ class FinancialMainAccount(models.Model):
         ('detailed', 'Detailed Account'),
     ]
 
+    BALANCE_TYPE_CHOICES = [
+        ('ordinary', 'Ordinary'),
+        ('extraordinary', 'Extraordinary'),
+    ]
+
     building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='financial_accounts')
     code = models.CharField(max_length=20)
     name = models.CharField(max_length=200)
@@ -112,6 +117,7 @@ class FinancialMainAccount(models.Model):
     assembly_start_date = models.DateField(null=True, blank=True)
     assembly_end_date = models.DateField(null=True, blank=True)
     fiscal_year = models.IntegerField(null=True, blank=True)
+    balance_type = models.CharField(max_length=20, choices=BALANCE_TYPE_CHOICES, default='ordinary')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

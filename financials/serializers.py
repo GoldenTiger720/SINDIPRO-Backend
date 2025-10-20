@@ -22,11 +22,12 @@ class FinancialMainAccountSerializer(serializers.ModelSerializer):
     assemblyStartDate = serializers.DateField(source='assembly_start_date', required=False, allow_null=True)
     assemblyEndDate = serializers.DateField(source='assembly_end_date', required=False, allow_null=True)
     fiscalYear = serializers.IntegerField(source='fiscal_year', required=False, allow_null=True)
+    balanceType = serializers.CharField(source='balance_type', required=False, default='ordinary')
 
     class Meta:
         model = FinancialMainAccount
         fields = ['buildingId', 'code', 'name', 'type', 'parentId', 'actualAmount', 'expectedAmount',
-                  'assemblyStartDate', 'assemblyEndDate', 'fiscalYear']
+                  'assemblyStartDate', 'assemblyEndDate', 'fiscalYear', 'balanceType']
 
     def create(self, validated_data):
         return FinancialMainAccount.objects.create(**validated_data)
@@ -39,11 +40,12 @@ class FinancialMainAccountReadSerializer(serializers.ModelSerializer):
     assemblyStartDate = serializers.DateField(source='assembly_start_date', read_only=True)
     assemblyEndDate = serializers.DateField(source='assembly_end_date', read_only=True)
     fiscalYear = serializers.IntegerField(source='fiscal_year', read_only=True)
+    balanceType = serializers.CharField(source='balance_type', read_only=True)
 
     class Meta:
         model = FinancialMainAccount
         fields = ['id', 'building', 'code', 'name', 'type', 'parentId', 'actualAmount', 'expectedAmount',
-                  'assemblyStartDate', 'assemblyEndDate', 'fiscalYear', 'created_at', 'updated_at']
+                  'assemblyStartDate', 'assemblyEndDate', 'fiscalYear', 'balanceType', 'created_at', 'updated_at']
 
 class AnnualBudgetSerializer(serializers.ModelSerializer):
     account_category = serializers.CharField(write_only=True)
