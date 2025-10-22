@@ -28,4 +28,8 @@ urlpatterns = [
     # Account balances
     path('account-balance/', views.account_balance_view, name='account_balance_view'),
     path('account-balance/<int:balance_id>/', views.account_balance_detail_view, name='account_balance_detail'),
+
+    # Account transactions (expense entries with month tracking)
+    path('account-transaction/', views.account_transaction_view, name='account_transaction_view'),
+    path('account-transaction/<int:transaction_id>/', views.account_transaction_detail_view, name='account_transaction_detail'),
 ]

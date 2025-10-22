@@ -129,6 +129,34 @@ class FinancialMainAccount(models.Model):
     def __str__(self):
         return f"{self.building.building_name} - {self.code} - {self.name}"
 
+
+class FinancialAccountTransaction(models.Model):
+    """
+    Individual expense transactions for financial accounts with month tracking.
+    Each transaction records when an expense was added to an account.
+    """
+    account = models.ForeignKey(FinancialMainAccount, on_delete=models.CASCADE, related_name='transactions')
+    building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='account_transactions')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    reference_month = models.CharField(max_length=7)  # Format: YYYY-MM
+    description = models.TextField(blank=True)
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'financials_account_transaction'
+        ordering = ['-reference_month', '-created_at']
+        indexes = [
+            models.Index(fields=['account', 'reference_month']),
+            models.Index(fields=['building', 'reference_month']),
+        ]
+
+    def __str__(self):
+        return f"{self.account.code} - {self.account.name} - {self.reference_month}: R$ {self.amount}"
+
+
 class Collection(models.Model):
     building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='collections')
     name = models.CharField(max_length=200)

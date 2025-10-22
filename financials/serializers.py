@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     FinancialMainAccount, AnnualBudget, BudgetCategory, Expense, Collection,
-    RevenueAccount, ExpenseEntry, AdditionalCharge, AccountBalance
+    RevenueAccount, ExpenseEntry, AdditionalCharge, AccountBalance, FinancialAccountTransaction
 )
 from building_mgmt.models import Building
 from datetime import datetime
@@ -309,6 +309,36 @@ class AccountBalanceSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+class FinancialAccountTransactionSerializer(serializers.ModelSerializer):
+    """Serializer for creating and reading financial account transactions"""
+    accountId = serializers.IntegerField(source='account_id')
+    buildingId = serializers.IntegerField(source='building_id')
+    referenceMonth = serializers.CharField(source='reference_month')
+    accountCode = serializers.CharField(source='account.code', read_only=True)
+    accountName = serializers.CharField(source='account.name', read_only=True)
+
+    class Meta:
+        model = FinancialAccountTransaction
+        fields = ['id', 'accountId', 'buildingId', 'amount', 'referenceMonth',
+                 'description', 'accountCode', 'accountName', 'createdAt', 'updatedAt']
+        read_only_fields = ['id', 'accountCode', 'accountName', 'createdAt', 'updatedAt']
+
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    def create(self, validated_data):
+        # Create the transaction
+        validated_data['created_by'] = self.context.get('request').user if self.context.get('request') else None
+        transaction = FinancialAccountTransaction.objects.create(**validated_data)
+
+        # Update the account's actual_amount
+        account = transaction.account
+        account.actual_amount += transaction.amount
+        account.save()
+
+        return transaction
 
 
 class FinancialReportSerializer(serializers.Serializer):

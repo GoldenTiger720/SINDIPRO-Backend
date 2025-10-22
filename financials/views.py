@@ -2,10 +2,11 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from .models import FinancialMainAccount, AnnualBudget, Expense, Collection
-from .serializers import (FinancialMainAccountSerializer, FinancialMainAccountReadSerializer, 
-                          AnnualBudgetSerializer, ExpenseSerializer, ExpenseReadSerializer, 
-                          AnnualBudgetReadSerializer, CollectionSerializer, CollectionReadSerializer)
+from .models import FinancialMainAccount, AnnualBudget, Expense, Collection, FinancialAccountTransaction
+from .serializers import (FinancialMainAccountSerializer, FinancialMainAccountReadSerializer,
+                          AnnualBudgetSerializer, ExpenseSerializer, ExpenseReadSerializer,
+                          AnnualBudgetReadSerializer, CollectionSerializer, CollectionReadSerializer,
+                          FinancialAccountTransactionSerializer)
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
@@ -683,3 +684,78 @@ def account_balance_detail_view(request, balance_id):
     elif request.method == 'DELETE':
         balance.delete()
         return Response({'message': 'Account balance deleted successfully'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def account_transaction_view(request):
+    """
+    GET: Retrieve account transactions
+         Query parameters:
+         - building_id (required)
+         - account_id (optional)
+         - reference_month (optional)
+    POST: Create a new account transaction (expense entry for an account)
+    Expected data structure:
+    {
+        "accountId": 1,
+        "buildingId": 1,
+        "amount": 100.50,
+        "referenceMonth": "2025-10",
+        "description": "Optional description"
+    }
+    """
+    if request.method == 'GET':
+        building_id = request.GET.get('building_id')
+        if not building_id:
+            return Response({'error': 'building_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        transactions = FinancialAccountTransaction.objects.filter(building_id=building_id).select_related('account')
+
+        # Optional filters
+        account_id = request.GET.get('account_id')
+        if account_id:
+            transactions = transactions.filter(account_id=account_id)
+
+        reference_month = request.GET.get('reference_month')
+        if reference_month:
+            transactions = transactions.filter(reference_month=reference_month)
+
+        transactions = transactions.order_by('-reference_month', '-created_at')
+        serializer = FinancialAccountTransactionSerializer(transactions, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        serializer = FinancialAccountTransactionSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            transaction = serializer.save()
+            response_serializer = FinancialAccountTransactionSerializer(transaction)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response({'error': 'Invalid data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def account_transaction_detail_view(request, transaction_id):
+    """
+    GET: Get a specific transaction
+    DELETE: Delete a transaction and adjust the account's actual_amount
+    """
+    try:
+        transaction = FinancialAccountTransaction.objects.select_related('account').get(id=transaction_id)
+    except FinancialAccountTransaction.DoesNotExist:
+        return Response({'error': 'Transaction not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = FinancialAccountTransactionSerializer(transaction)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'DELETE':
+        # Adjust the account's actual_amount before deleting
+        account = transaction.account
+        account.actual_amount -= transaction.amount
+        account.save()
+
+        transaction.delete()
+        return Response({'message': 'Transaction deleted successfully'}, status=status.HTTP_200_OK)
