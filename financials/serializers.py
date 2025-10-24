@@ -340,6 +340,40 @@ class FinancialAccountTransactionSerializer(serializers.ModelSerializer):
 
         return transaction
 
+    def update(self, instance, validated_data):
+        # Store old values for account adjustment
+        old_amount = instance.amount
+        old_account = instance.account
+
+        # Get new account if account_id is being changed
+        new_account_id = validated_data.get('account_id', instance.account_id)
+        new_account = FinancialMainAccount.objects.get(id=new_account_id) if new_account_id != instance.account_id else old_account
+        new_amount = validated_data.get('amount', instance.amount)
+
+        # If account changed, adjust both old and new account's actual_amount
+        if new_account.id != old_account.id:
+            # Remove amount from old account
+            old_account.actual_amount -= old_amount
+            old_account.save()
+
+            # Add amount to new account
+            new_account.actual_amount += new_amount
+            new_account.save()
+        else:
+            # Same account, just adjust the difference
+            amount_difference = new_amount - old_amount
+            old_account.actual_amount += amount_difference
+            old_account.save()
+
+        # Update the transaction fields
+        instance.account_id = new_account_id
+        instance.amount = new_amount
+        instance.reference_month = validated_data.get('reference_month', instance.reference_month)
+        instance.description = validated_data.get('description', instance.description)
+        instance.save()
+
+        return instance
+
 
 class FinancialReportSerializer(serializers.Serializer):
     """Serializer for financial report data aggregation"""

@@ -735,11 +735,12 @@ def account_transaction_view(request):
         return Response({'error': 'Invalid data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET', 'DELETE'])
+@api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def account_transaction_detail_view(request, transaction_id):
     """
     GET: Get a specific transaction
+    PUT: Update a transaction and adjust the account's actual_amount accordingly
     DELETE: Delete a transaction and adjust the account's actual_amount
     """
     try:
@@ -750,6 +751,19 @@ def account_transaction_detail_view(request, transaction_id):
     if request.method == 'GET':
         serializer = FinancialAccountTransactionSerializer(transaction)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'PUT':
+        # Update the transaction
+        serializer = FinancialAccountTransactionSerializer(
+            transaction,
+            data=request.data,
+            partial=True,
+            context={'request': request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
         # Adjust the account's actual_amount before deleting
