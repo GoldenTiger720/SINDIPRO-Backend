@@ -381,16 +381,28 @@ def financial_report_view(request):
             'error': 'building_id, fiscal_year_start, and fiscal_year_end are required'
         }, status=status.HTTP_400_BAD_REQUEST)
 
-    from .serializers import FinancialReportSerializer
+    try:
+        from .serializers import FinancialReportSerializer
 
-    data = {
-        'building_id': int(building_id),
-        'fiscal_year_start': fiscal_year_start,
-        'fiscal_year_end': fiscal_year_end
-    }
+        data = {
+            'building_id': int(building_id),
+            'fiscal_year_start': fiscal_year_start,
+            'fiscal_year_end': fiscal_year_end
+        }
 
-    serializer = FinancialReportSerializer(data)
-    return Response(serializer.to_representation(data), status=status.HTTP_200_OK)
+        serializer = FinancialReportSerializer(data)
+        result = serializer.to_representation(data)
+        return Response(result, status=status.HTTP_200_OK)
+    except Exception as e:
+        import traceback
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error generating financial report: {str(e)}")
+        logger.error(traceback.format_exc())
+        return Response({
+            'error': f'Failed to generate report: {str(e)}',
+            'type': type(e).__name__
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET', 'POST'])

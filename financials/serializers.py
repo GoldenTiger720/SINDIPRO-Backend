@@ -394,7 +394,13 @@ class FinancialReportSerializer(serializers.Serializer):
         # Get all revenue accounts for this building
         revenue_accounts = RevenueAccount.objects.filter(building_id=building_id)
 
-        # Get all expense entries for this building
+        # Get all expense transactions for this building (NEW system)
+        from .models import FinancialAccountTransaction
+        expense_transactions = FinancialAccountTransaction.objects.filter(
+            building_id=building_id
+        ).select_related('account')
+
+        # Get all expense entries for this building (OLD system - kept for compatibility)
         expense_entries = ExpenseEntry.objects.filter(building_id=building_id)
 
         # Generate list of months in the period
@@ -413,10 +419,25 @@ class FinancialReportSerializer(serializers.Serializer):
             months.append(current.strftime('%Y-%m'))
             current += relativedelta(months=1)
 
+        # Get all financial accounts for this building to track per-account monthly data
+        financial_accounts = list(FinancialMainAccount.objects.filter(building_id=building_id))
+
+        # Pre-aggregate transactions by account and month to avoid N+1 queries
+        # Also aggregate by month and parent category for the monthly expenses calculation
+        transactions_by_account_month = defaultdict(lambda: defaultdict(Decimal))
+        transactions_by_month = defaultdict(list)
+
+        for transaction in expense_transactions:
+            transactions_by_account_month[transaction.account_id][transaction.reference_month] += transaction.amount
+            transactions_by_month[transaction.reference_month].append(transaction)
+
         # Aggregate data by month
         monthly_data = []
         total_revenue = Decimal('0')
         total_expenses = Decimal('0')
+
+        # Track monthly data per account
+        account_monthly_data = defaultdict(list)
 
         for month in months:
             # Calculate revenue for this month
@@ -433,12 +454,56 @@ class FinancialReportSerializer(serializers.Serializer):
 
             # Calculate expenses by parent account for this month
             expenses_by_parent = defaultdict(Decimal)
+            month_expenses = Decimal('0')
+
+            # Track expenses per account for this month
+            for account in financial_accounts:
+                account_id = account.id
+                account_code = account.code
+                account_name = account.name
+
+                # Calculate expected amount for this month if within assembly period
+                expected_amount = Decimal('0')
+                if account.assembly_start_date and account.assembly_end_date:
+                    # Handle both string and date objects
+                    if isinstance(account.assembly_start_date, str):
+                        start_date_obj = datetime.strptime(account.assembly_start_date, '%Y-%m')
+                        end_date_obj = datetime.strptime(account.assembly_end_date, '%Y-%m')
+                    else:
+                        # Already date objects, convert to datetime for comparison
+                        start_date_obj = datetime(account.assembly_start_date.year, account.assembly_start_date.month, 1)
+                        end_date_obj = datetime(account.assembly_end_date.year, account.assembly_end_date.month, 1)
+
+                    month_date_obj = datetime.strptime(month, '%Y-%m')
+
+                    if start_date_obj <= month_date_obj <= end_date_obj:
+                        expected_amount = account.expected_amount or Decimal('0')
+
+                # Get actual expenses for this account in this month from pre-aggregated data
+                actual_amount = transactions_by_account_month[account_id].get(month, Decimal('0'))
+
+                # Add to account monthly data
+                account_monthly_data[account_id].append({
+                    'month': month,
+                    'accountCode': account_code,
+                    'accountName': account_name,
+                    'expectedAmount': float(expected_amount),
+                    'actualAmount': float(actual_amount),
+                })
+
+            # Include NEW FinancialAccountTransaction expenses (use pre-aggregated data)
+            month_transactions = transactions_by_month.get(month, [])
+            for transaction in month_transactions:
+                month_expenses += transaction.amount
+                # Group by parent account category if available
+                parent_category = getattr(transaction.account, 'parent_account_category', 'miscellaneous')
+                expenses_by_parent[parent_category] += transaction.amount
+
+            # Include OLD ExpenseEntry expenses for backward compatibility
             month_expenses_entries = expense_entries.filter(reference_month=month)
-
             for expense in month_expenses_entries:
+                month_expenses += expense.amount
                 expenses_by_parent[expense.parent_account] += expense.amount
-
-            month_expenses = sum(expenses_by_parent.values())
 
             # Check if month is outside fiscal period
             is_outside = month < fiscal_year_start or month > fiscal_year_end
@@ -446,7 +511,7 @@ class FinancialReportSerializer(serializers.Serializer):
             monthly_data.append({
                 'month': month,
                 'totalRevenue': float(month_revenue),
-                'totalExpenses': float(month_expenses),
+                'totalExpense': float(month_expenses),  # Changed from totalExpenses to totalExpense to match frontend
                 'isOutsideFiscalPeriod': is_outside,
                 'expensesByParent': {
                     'personnel_and_charges': float(expenses_by_parent.get('personnel_and_charges', Decimal('0'))),
@@ -461,11 +526,25 @@ class FinancialReportSerializer(serializers.Serializer):
             total_revenue += month_revenue
             total_expenses += month_expenses
 
+        # Convert account_monthly_data to a list format
+        accounts_data = []
+        for account_id, monthly_records in account_monthly_data.items():
+            if monthly_records:  # Only include accounts with data
+                # Get account info from first record
+                first_record = monthly_records[0]
+                accounts_data.append({
+                    'accountId': account_id,
+                    'accountCode': first_record['accountCode'],
+                    'accountName': first_record['accountName'],
+                    'monthlyData': monthly_records
+                })
+
         return {
             'buildingId': building_id,
             'fiscalYearStart': fiscal_year_start,
             'fiscalYearEnd': fiscal_year_end,
             'totalPlannedRevenue': float(total_revenue),
             'totalActualExpenses': float(total_expenses),
-            'monthlyData': monthly_data
+            'monthlyData': monthly_data,
+            'accountsData': accounts_data
         }
