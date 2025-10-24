@@ -32,4 +32,7 @@ urlpatterns = [
     # Account transactions (expense entries with month tracking)
     path('account-transaction/', views.account_transaction_view, name='account_transaction_view'),
     path('account-transaction/<int:transaction_id>/', views.account_transaction_detail_view, name='account_transaction_detail'),
+
+    # Account monthly data for budget evolution
+    path('account-monthly-data/', views.account_monthly_data_view, name='account_monthly_data'),
 ]

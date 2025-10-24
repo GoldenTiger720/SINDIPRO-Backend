@@ -7,6 +7,9 @@ from .serializers import (FinancialMainAccountSerializer, FinancialMainAccountRe
                           AnnualBudgetSerializer, ExpenseSerializer, ExpenseReadSerializer,
                           AnnualBudgetReadSerializer, CollectionSerializer, CollectionReadSerializer,
                           FinancialAccountTransactionSerializer)
+from datetime import datetime
+from collections import defaultdict
+from decimal import Decimal
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
@@ -785,3 +788,90 @@ def account_transaction_detail_view(request, transaction_id):
 
         transaction.delete()
         return Response({'message': 'Transaction deleted successfully'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def account_monthly_data_view(request):
+    """
+    GET: Retrieve monthly breakdown data for a specific account
+         Query parameters:
+         - account_id (required): The financial account ID
+         - year (optional): Year to filter data (defaults to current year)
+    """
+    account_id = request.GET.get('account_id')
+    year = request.GET.get('year', str(datetime.now().year))
+
+    if not account_id:
+        return Response({
+            'error': 'account_id is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # Get the account
+        account = FinancialMainAccount.objects.get(id=account_id)
+
+        # Get all transactions for this account in the specified year
+        transactions = FinancialAccountTransaction.objects.filter(
+            account_id=account_id,
+            reference_month__startswith=year
+        ).order_by('reference_month')
+
+        # Aggregate transactions by month
+        monthly_actual = defaultdict(Decimal)
+        for transaction in transactions:
+            monthly_actual[transaction.reference_month] += transaction.amount
+
+        # Generate data for all 12 months
+        months_data = []
+        for month_num in range(1, 13):
+            month_str = f"{year}-{str(month_num).zfill(2)}"
+
+            # Calculate expected amount for this month if within assembly period
+            expected_amount = Decimal('0')
+            if account.assembly_start_date and account.assembly_end_date:
+                # Handle both string and date objects
+                if isinstance(account.assembly_start_date, str):
+                    start_date = datetime.strptime(account.assembly_start_date, '%Y-%m')
+                    end_date = datetime.strptime(account.assembly_end_date, '%Y-%m')
+                else:
+                    start_date = datetime(account.assembly_start_date.year, account.assembly_start_date.month, 1)
+                    end_date = datetime(account.assembly_end_date.year, account.assembly_end_date.month, 1)
+
+                month_date = datetime(int(year), month_num, 1)
+
+                if start_date <= month_date <= end_date:
+                    expected_amount = account.expected_amount or Decimal('0')
+
+            actual_amount = monthly_actual.get(month_str, Decimal('0'))
+
+            months_data.append({
+                'month': month_str,
+                'expectedAmount': float(expected_amount),
+                'actualAmount': float(actual_amount),
+            })
+
+        return Response({
+            'accountId': account.id,
+            'accountCode': account.code,
+            'accountName': account.name,
+            'year': year,
+            'totalExpected': float(account.expected_amount or 0),
+            'totalActual': float(account.actual_amount or 0),
+            'monthlyData': months_data
+        }, status=status.HTTP_200_OK)
+
+    except FinancialMainAccount.DoesNotExist:
+        return Response({
+            'error': 'Account not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        import traceback
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching account monthly data: {str(e)}")
+        logger.error(traceback.format_exc())
+        return Response({
+            'error': f'Failed to fetch account monthly data: {str(e)}',
+            'type': type(e).__name__
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
