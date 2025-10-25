@@ -507,7 +507,7 @@ def calculate_fees_view(request):
                 'error': 'No units found for this building'
             }, status=status.HTTP_404_NOT_FOUND)
 
-        # Calculate total ideal fraction
+        # Calculate total ideal fraction (stored as decimals, should sum to 1.0)
         total_ideal_fraction = sum(float(unit.ideal_fraction) for unit in units)
         is_fraction_valid = abs(total_ideal_fraction - 1.0) < 0.0001  # Allow small floating point errors
 
@@ -541,6 +541,7 @@ def calculate_fees_view(request):
         # Calculate fees for each unit
         unit_fees = []
         for unit in units:
+            # Get ideal_fraction as-is from database (stored as decimal, e.g., 0.009285)
             ideal_fraction = float(unit.ideal_fraction)
 
             # Calculate regular fee
@@ -556,7 +557,7 @@ def calculate_fees_view(request):
                 'unitId': unit.id,
                 'unitNumber': unit.number,
                 'ownerName': unit.owner or '',
-                'idealFraction': ideal_fraction,
+                'idealFraction': ideal_fraction,  # Return raw value from database
                 'regularFee': round(regular_fee, 2),
                 'additionalFee': round(additional_fee, 2),
                 'totalFee': round(total_fee, 2)
@@ -608,7 +609,7 @@ def validate_fractions_view(request):
                 'unitCount': 0
             }, status=status.HTTP_200_OK)
 
-        # Calculate total ideal fraction
+        # Calculate total ideal fraction (stored as decimals, should sum to 1.0)
         total_fraction = sum(float(unit.ideal_fraction) for unit in units)
 
         # Check if total is approximately 1.0 (100%)
