@@ -277,28 +277,15 @@ class AccountBalanceSerializer(serializers.ModelSerializer):
     accountName = serializers.CharField(source='account_name')
     referenceMonth = serializers.CharField(source='reference_month')
     balanceType = serializers.ChoiceField(source='balance_type', choices=AccountBalance.BALANCE_TYPE_CHOICES, default='ordinary')
-    balanceName = serializers.CharField(source='balance_name', required=False, allow_blank=True)
 
     class Meta:
         model = AccountBalance
         fields = ['id', 'buildingId', 'accountName',
-                 'referenceMonth', 'balance', 'delinquency', 'balanceType', 'balanceName', 'createdAt', 'updatedAt']
+                 'referenceMonth', 'balance', 'delinquency', 'balanceType', 'createdAt', 'updatedAt']
         read_only_fields = ['id', 'createdAt', 'updatedAt']
 
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
-
-    def validate(self, data):
-        """Validate that extraordinary balances have a balance_name"""
-        balance_type = data.get('balance_type', 'ordinary')
-        balance_name = data.get('balance_name', '')
-
-        if balance_type == 'extraordinary' and not balance_name:
-            raise serializers.ValidationError({
-                'balanceName': 'Balance name is required for extraordinary balances'
-            })
-
-        return data
 
     def create(self, validated_data):
         validated_data['created_by'] = self.context.get('request').user if self.context.get('request') else None

@@ -825,6 +825,7 @@ def account_monthly_data_view(request):
 
         # Generate data for all 12 months
         months_data = []
+        total_expected_for_year = Decimal('0')  # Sum of all months with expected values
         for month_num in range(1, 13):
             month_str = f"{year}-{str(month_num).zfill(2)}"
 
@@ -843,6 +844,7 @@ def account_monthly_data_view(request):
 
                 if start_date <= month_date <= end_date:
                     expected_amount = account.expected_amount or Decimal('0')
+                    total_expected_for_year += expected_amount  # Add to yearly total
 
             actual_amount = monthly_actual.get(month_str, Decimal('0'))
 
@@ -857,7 +859,7 @@ def account_monthly_data_view(request):
             'accountCode': account.code,
             'accountName': account.name,
             'year': year,
-            'totalExpected': float(account.expected_amount or 0),
+            'totalExpected': float(total_expected_for_year),  # Sum of expected amounts for all months in assembly period
             'totalActual': float(account.actual_amount or 0),
             'monthlyData': months_data
         }, status=status.HTTP_200_OK)

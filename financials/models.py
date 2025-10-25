@@ -308,7 +308,6 @@ class AccountBalance(models.Model):
     balance = models.DecimalField(max_digits=12, decimal_places=2)
     delinquency = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # Pending amounts not yet paid
     balance_type = models.CharField(max_length=20, choices=BALANCE_TYPE_CHOICES, default='ordinary')
-    balance_name = models.CharField(max_length=200, blank=True)  # Required only for extraordinary balances
 
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
