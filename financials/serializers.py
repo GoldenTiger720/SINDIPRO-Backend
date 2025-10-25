@@ -400,9 +400,6 @@ class FinancialReportSerializer(serializers.Serializer):
             building_id=building_id
         ).select_related('account')
 
-        # Get all expense entries for this building (OLD system - kept for compatibility)
-        expense_entries = ExpenseEntry.objects.filter(building_id=building_id)
-
         # Generate list of months in the period
         start_date = datetime.strptime(fiscal_year_start, '%Y-%m')
         end_date = datetime.strptime(fiscal_year_end, '%Y-%m')
@@ -430,6 +427,24 @@ class FinancialReportSerializer(serializers.Serializer):
         for transaction in expense_transactions:
             transactions_by_account_month[transaction.account_id][transaction.reference_month] += transaction.amount
             transactions_by_month[transaction.reference_month].append(transaction)
+
+        # Calculate totalPlannedRevenue as sum of all accounts' total amounts (expectedAmount × months)
+        total_planned_revenue = Decimal('0')
+        for account in financial_accounts:
+            if account.assembly_start_date and account.assembly_end_date and account.expected_amount:
+                # Parse dates
+                if isinstance(account.assembly_start_date, str):
+                    start_date_obj = datetime.strptime(account.assembly_start_date, '%Y-%m')
+                    end_date_obj = datetime.strptime(account.assembly_end_date, '%Y-%m')
+                else:
+                    start_date_obj = datetime(account.assembly_start_date.year, account.assembly_start_date.month, 1)
+                    end_date_obj = datetime(account.assembly_end_date.year, account.assembly_end_date.month, 1)
+
+                # Calculate number of months in assembly period
+                months_diff = (end_date_obj.year - start_date_obj.year) * 12 + (end_date_obj.month - start_date_obj.month) + 1
+
+                # Add to total planned revenue
+                total_planned_revenue += account.expected_amount * months_diff
 
         # Aggregate data by month
         monthly_data = []
@@ -499,11 +514,8 @@ class FinancialReportSerializer(serializers.Serializer):
                 parent_category = getattr(transaction.account, 'parent_account_category', 'miscellaneous')
                 expenses_by_parent[parent_category] += transaction.amount
 
-            # Include OLD ExpenseEntry expenses for backward compatibility
-            month_expenses_entries = expense_entries.filter(reference_month=month)
-            for expense in month_expenses_entries:
-                month_expenses += expense.amount
-                expenses_by_parent[expense.parent_account] += expense.amount
+            # Note: OLD ExpenseEntry system is deprecated and no longer used
+            # We only use FinancialAccountTransaction (new system) to match Expense Tracking tab
 
             # Check if month is outside fiscal period
             is_outside = month < fiscal_year_start or month > fiscal_year_end
@@ -543,7 +555,7 @@ class FinancialReportSerializer(serializers.Serializer):
             'buildingId': building_id,
             'fiscalYearStart': fiscal_year_start,
             'fiscalYearEnd': fiscal_year_end,
-            'totalPlannedRevenue': float(total_revenue),
+            'totalPlannedRevenue': float(total_planned_revenue),
             'totalActualExpenses': float(total_expenses),
             'monthlyData': monthly_data,
             'accountsData': accounts_data
