@@ -496,7 +496,7 @@ def calculate_fees_view(request):
 
     try:
         from building_mgmt.models import Unit
-        from .models import RevenueAccount, AdditionalCharge
+        from .models import FinancialMainAccount
         from decimal import Decimal
 
         # Get all units for the building
@@ -511,29 +511,19 @@ def calculate_fees_view(request):
         total_ideal_fraction = sum(float(unit.ideal_fraction) for unit in units)
         is_fraction_valid = abs(total_ideal_fraction - 100.0) < 0.01  # Allow small floating point errors
 
-        # Get revenue accounts for the building and reference month
-        revenue_accounts = RevenueAccount.objects.filter(
-            building_id=building_id
-        )
-
-        # Calculate total regular budget from revenue accounts
-        total_regular_budget = Decimal('0.00')
-        for revenue in revenue_accounts:
-            # Extract year from reference_month (YYYY-MM format)
-            reference_year = reference_month[:4]
-
-            # Check if the reference year is within the revenue period (years are stored as YYYY)
-            if revenue.start_month <= reference_year <= revenue.end_month:
-                total_regular_budget += revenue.monthly_amount
-
-        # Get active additional charges for the reference month
-        additional_charges = AdditionalCharge.objects.filter(
+        # Calculate total regular budget from FinancialMainAccount with balance_type='ordinary'
+        ordinary_accounts = FinancialMainAccount.objects.filter(
             building_id=building_id,
-            reference_month=reference_month,
-            active=True
+            balance_type='ordinary'
         )
+        total_regular_budget = sum(account.expected_amount for account in ordinary_accounts)
 
-        total_additional_charges = sum(charge.total_amount for charge in additional_charges)
+        # Calculate total additional charges from FinancialMainAccount with balance_type='extraordinary'
+        extraordinary_accounts = FinancialMainAccount.objects.filter(
+            building_id=building_id,
+            balance_type='extraordinary'
+        )
+        total_additional_charges = sum(account.expected_amount for account in extraordinary_accounts)
 
         # Calculate total monthly collection
         total_monthly_collection = total_regular_budget + total_additional_charges
@@ -541,14 +531,14 @@ def calculate_fees_view(request):
         # Calculate fees for each unit
         unit_fees = []
         for unit in units:
-            # Get ideal_fraction as-is from database (stored as decimal, e.g., 0.009285)
+            # Get ideal_fraction as-is from database (stored as percentage, e.g., 1.5 for 1.5%)
             ideal_fraction = float(unit.ideal_fraction)
 
-            # Calculate regular fee
-            regular_fee = float(total_regular_budget) * ideal_fraction
+            # Calculate regular fee: Total Regular Budget * (Ideal Fraction / 100)
+            regular_fee = float(total_regular_budget) * (ideal_fraction / 100)
 
-            # Calculate additional fee
-            additional_fee = float(total_additional_charges) * ideal_fraction
+            # Calculate additional fee: Total Additional Charges * (Ideal Fraction / 100)
+            additional_fee = float(total_additional_charges) * (ideal_fraction / 100)
 
             # Calculate total fee
             total_fee = regular_fee + additional_fee
