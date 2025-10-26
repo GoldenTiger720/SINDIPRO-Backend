@@ -507,9 +507,9 @@ def calculate_fees_view(request):
                 'error': 'No units found for this building'
             }, status=status.HTTP_404_NOT_FOUND)
 
-        # Calculate total ideal fraction (stored as decimals, should sum to 1.0)
+        # Calculate total ideal fraction (stored as percentages like 0.009285%, should sum to 100.0%)
         total_ideal_fraction = sum(float(unit.ideal_fraction) for unit in units)
-        is_fraction_valid = abs(total_ideal_fraction - 1.0) < 0.0001  # Allow small floating point errors
+        is_fraction_valid = abs(total_ideal_fraction - 100.0) < 0.01  # Allow small floating point errors
 
         # Get revenue accounts for the building and reference month
         revenue_accounts = RevenueAccount.objects.filter(
@@ -609,11 +609,11 @@ def validate_fractions_view(request):
                 'unitCount': 0
             }, status=status.HTTP_200_OK)
 
-        # Calculate total ideal fraction (stored as decimals, should sum to 1.0)
+        # Calculate total ideal fraction (stored as percentages like 0.009285%, should sum to 100.0%)
         total_fraction = sum(float(unit.ideal_fraction) for unit in units)
 
-        # Check if total is approximately 1.0 (100%)
-        is_valid = abs(total_fraction - 1.0) < 0.0001  # Allow small floating point errors
+        # Check if total is approximately 100.0%
+        is_valid = abs(total_fraction - 100.0) < 0.01  # Allow small floating point errors
 
         return Response({
             'isValid': is_valid,
