@@ -4,12 +4,16 @@ from .models import ConsumptionRegister, ConsumptionAccount, SubAccount
 
 class ConsumptionRegisterSerializer(serializers.ModelSerializer):
     utilityType = serializers.CharField(source='utility_type')
-    subAccount = serializers.SerializerMethodField()
+    subAccount = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ConsumptionRegister
-        fields = ['id', 'date', 'utilityType', 'value', 'subAccount', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        fields = ['id', 'building_id', 'date', 'utilityType', 'value', 'subAccount', 'sub_account', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'subAccount']
+        extra_kwargs = {
+            'building_id': {'source': 'building', 'write_only': False},
+            'sub_account': {'write_only': True, 'required': False},
+        }
 
     def get_subAccount(self, obj):
         """Return sub_account details including id and name"""
@@ -22,15 +26,14 @@ class ConsumptionRegisterSerializer(serializers.ModelSerializer):
         return None
 
     def to_internal_value(self, data):
-        # Map frontend field names to model field names
-        internal_data = data.copy()
+        # Create a mutable copy of the data
+        internal_data = data.copy() if hasattr(data, 'copy') else dict(data)
 
-        if 'utilityType' in data:
-            internal_data['utility_type'] = data['utilityType']
+        # Map subAccount -> sub_account for write operations
+        if 'subAccount' in internal_data:
+            internal_data['sub_account'] = internal_data.pop('subAccount')
 
-        if 'subAccount' in data:
-            internal_data['sub_account'] = data['subAccount']
-
+        # The utilityType -> utility_type mapping is handled automatically by the field declaration
         return super().to_internal_value(internal_data)
 
 
