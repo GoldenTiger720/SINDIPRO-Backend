@@ -175,8 +175,8 @@ def export_consumption_excel(request):
     if utility_type:
         registers = registers.filter(utility_type=utility_type)
 
-    # Order by date descending
-    registers = registers.order_by('-date')
+    # Order by date ascending (oldest first)
+    registers = registers.order_by('date')
 
     # Create workbook and worksheet
     wb = Workbook()
@@ -203,20 +203,20 @@ def export_consumption_excel(request):
     )
 
     # Title
-    ws.merge_cells('A1:E1')
+    ws.merge_cells('A1:F1')
     title_cell = ws['A1']
     title_cell.value = report_title
     title_cell.font = Font(bold=True, size=16)
     title_cell.alignment = Alignment(horizontal="center")
 
     # Export date
-    ws.merge_cells('A2:E2')
+    ws.merge_cells('A2:F2')
     date_info = ws['A2']
     date_info.value = f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     date_info.alignment = Alignment(horizontal="center")
 
     # Headers
-    headers = ['Date', 'Utility Type', 'Sub Account', 'Value', 'Unit']
+    headers = ['Date', 'Utility Type', 'Sub Account', 'Value', 'Consumption', 'Unit']
 
     # Write headers
     for col, header in enumerate(headers, 1):
@@ -227,11 +227,16 @@ def export_consumption_excel(request):
         cell.alignment = header_alignment
         cell.border = border
 
-    # Write consumption data
+    # Write consumption data with daily change calculation
     row = 5
     total_value = Decimal('0')
+    total_consumption = Decimal('0')
+    previous_value = None
 
-    for register in registers:
+    # Convert queryset to list for easier indexing
+    registers_list = list(registers)
+
+    for index, register in enumerate(registers_list):
         # Get sub-account name
         sub_account_name = register.sub_account.name if register.sub_account else "N/A"
 
@@ -253,11 +258,23 @@ def export_consumption_excel(request):
         value_decimal = Decimal(str(register.value))
         total_value += value_decimal
 
+        # Calculate consumption (difference from previous day)
+        consumption = None
+        if index > 0:
+            previous_value = Decimal(str(registers_list[index - 1].value))
+            consumption = value_decimal - previous_value
+            total_consumption += consumption
+
+        # Format value to remove trailing zeros
+        value_formatted = float(value_decimal)
+        consumption_formatted = float(consumption) if consumption is not None else None
+
         data = [
             register.date.strftime('%Y-%m-%d'),
             utility_display,
             sub_account_name,
-            float(value_decimal),
+            value_formatted,
+            consumption_formatted if consumption_formatted is not None else '',
             unit_label
         ]
 
@@ -303,8 +320,15 @@ def export_consumption_excel(request):
     total_cell.alignment = Alignment(horizontal="center")
     total_cell.border = border
 
+    # Total consumption
+    total_consumption_cell = ws.cell(row=summary_row, column=5)
+    total_consumption_cell.value = float(total_consumption)
+    total_consumption_cell.font = Font(bold=True)
+    total_consumption_cell.alignment = Alignment(horizontal="center")
+    total_consumption_cell.border = border
+
     # Unit for total
-    unit_cell = ws.cell(row=summary_row, column=5)
+    unit_cell = ws.cell(row=summary_row, column=6)
     if utility_type:
         unit_cell.value = unit_map.get(utility_type, '')
     else:
@@ -315,9 +339,9 @@ def export_consumption_excel(request):
 
     # Record count
     summary_row += 1
-    ws.merge_cells(f'A{summary_row}:E{summary_row}')
+    ws.merge_cells(f'A{summary_row}:F{summary_row}')
     count_cell = ws[f'A{summary_row}']
-    count_cell.value = f"Total Records: {registers.count()}"
+    count_cell.value = f"Total Records: {len(registers_list)}"
     count_cell.font = Font(bold=True)
     count_cell.alignment = Alignment(horizontal="center")
 
@@ -380,7 +404,7 @@ def import_consumption_excel(request):
         # Find header row (should be row 4 based on export format)
         header_row = 4
         headers = []
-        for col in range(1, 6):  # 5 columns expected
+        for col in range(1, 7):  # 6 columns expected now (added Consumption)
             try:
                 cell_value = ws.cell(row=header_row, column=col).value
                 if cell_value:
@@ -391,10 +415,10 @@ def import_consumption_excel(request):
                 headers.append("")
 
         # Expected headers from export
-        expected_headers = ['Date', 'Utility Type', 'Sub Account', 'Value', 'Unit']
+        expected_headers = ['Date', 'Utility Type', 'Sub Account', 'Value', 'Consumption', 'Unit']
 
-        # Validate headers
-        if len(headers) < 4:  # At least first 4 headers
+        # Validate headers - Date, Utility Type, Sub Account, and Value are required
+        if len(headers) < 4:
             return Response({
                 'error': 'Invalid Excel format. Missing required columns.',
                 'expected_headers': expected_headers,
@@ -424,11 +448,12 @@ def import_consumption_excel(request):
 
         while True:
             try:
-                # Read row data
+                # Read row data (Consumption column is skipped - it's auto-calculated)
                 date_str = ws.cell(row=row_num, column=1).value
                 utility_type_str = ws.cell(row=row_num, column=2).value
                 sub_account_str = ws.cell(row=row_num, column=3).value
                 value_str = ws.cell(row=row_num, column=4).value
+                # Column 5 (Consumption) is ignored during import as it's calculated automatically
 
                 # Stop if we hit an empty row or summary section
                 if not date_str or str(date_str).strip() == '' or 'Total' in str(date_str):
