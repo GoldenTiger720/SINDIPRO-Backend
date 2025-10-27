@@ -10,15 +10,15 @@ from .serializers import ConsumptionRegisterSerializer, ConsumptionAccountSerial
 @permission_classes([IsAuthenticated])
 def consumption_register(request):
     """
-    GET: Retrieve all consumption register entries.
+    GET: Retrieve all consumption register entries with sub_account details.
     POST: Create a new consumption register entry.
-    Expected POST data: {date, gasCategory, utilityType, value}
+    Expected POST data: {date, utilityType, value, subAccount (optional)}
     """
     if request.method == 'GET':
-        registers = ConsumptionRegister.objects.all()
+        registers = ConsumptionRegister.objects.select_related('sub_account').all()
         serializer = ConsumptionRegisterSerializer(registers, many=True)
         return Response(serializer.data)
-    
+
     elif request.method == 'POST':
         serializer = ConsumptionRegisterSerializer(data=request.data)
         if serializer.is_valid():

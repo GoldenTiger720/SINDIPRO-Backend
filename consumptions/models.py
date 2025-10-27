@@ -78,16 +78,8 @@ class ConsumptionRegister(models.Model):
         ('gas', 'Gas'),
     ]
 
-    CATEGORY_CHOICES = [
-        ('units', 'Units'),
-        ('liters', 'Liters'),
-        ('kwh', 'kWh'),
-        ('m3', 'Cubic Meters'),
-    ]
-
     date = models.DateField()
     utility_type = models.CharField(max_length=20, choices=UTILITY_TYPE_CHOICES)
-    gas_category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, null=True, blank=True)
     value = models.DecimalField(max_digits=10, decimal_places=2)
     sub_account = models.ForeignKey('SubAccount', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumption_registers')
     created_at = models.DateTimeField(auto_now_add=True)
