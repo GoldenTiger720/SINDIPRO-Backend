@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from .models import FinancialMainAccount, AnnualBudget, Expense, Collection, FinancialAccountTransaction
+from .models import FinancialMainAccount, AnnualBudget, Expense, Collection, FinancialAccountTransaction, MarketValueSetting
 from .serializers import (FinancialMainAccountSerializer, FinancialMainAccountReadSerializer,
                           AnnualBudgetSerializer, ExpenseSerializer, ExpenseReadSerializer,
                           AnnualBudgetReadSerializer, CollectionSerializer, CollectionReadSerializer,
@@ -525,8 +525,8 @@ def calculate_fees_view(request):
         )
         total_additional_charges = sum(account.expected_amount for account in extraordinary_accounts)
 
-        # Calculate total monthly collection
-        total_monthly_collection = total_regular_budget + total_additional_charges
+        # Calculate total monthly collection (same as total regular budget)
+        total_monthly_collection = total_regular_budget
 
         # Calculate fees for each unit
         unit_fees = []
@@ -868,3 +868,81 @@ def account_monthly_data_view(request):
             'error': f'Failed to fetch account monthly data: {str(e)}',
             'type': type(e).__name__
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def market_value_setting_view(request):
+    """
+    GET: Retrieve market value settings for a building
+         Required query parameter: building_id
+    POST: Save or update market value settings for a building
+    """
+    if request.method == 'GET':
+        building_id = request.GET.get('building_id')
+
+        if not building_id:
+            return Response({
+                'error': 'building_id is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            setting = MarketValueSetting.objects.get(building_id=building_id)
+            return Response({
+                'saleMin': str(setting.sale_min),
+                'saleMax': str(setting.sale_max),
+                'rentalMin': str(setting.rental_min),
+                'rentalMax': str(setting.rental_max),
+                'condominiumMin': str(setting.condominium_min),
+                'condominiumMax': str(setting.condominium_max),
+            }, status=status.HTTP_200_OK)
+        except MarketValueSetting.DoesNotExist:
+            # Return default values if no settings exist
+            return Response({
+                'saleMin': '0',
+                'saleMax': '0',
+                'rentalMin': '0',
+                'rentalMax': '0',
+                'condominiumMin': '0',
+                'condominiumMax': '0',
+            }, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        building_id = request.data.get('building_id')
+
+        if not building_id:
+            return Response({
+                'error': 'building_id is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Get or create the setting for this building
+            setting, created = MarketValueSetting.objects.get_or_create(
+                building_id=building_id,
+                defaults={
+                    'created_by': request.user,
+                }
+            )
+
+            # Update the values
+            setting.sale_min = Decimal(str(request.data.get('saleMin', 0)))
+            setting.sale_max = Decimal(str(request.data.get('saleMax', 0)))
+            setting.rental_min = Decimal(str(request.data.get('rentalMin', 0)))
+            setting.rental_max = Decimal(str(request.data.get('rentalMax', 0)))
+            setting.condominium_min = Decimal(str(request.data.get('condominiumMin', 0)))
+            setting.condominium_max = Decimal(str(request.data.get('condominiumMax', 0)))
+
+            setting.save()
+
+            return Response({
+                'message': 'Market value settings saved successfully',
+                'created': created
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error saving market value settings: {str(e)}")
+            return Response({
+                'error': f'Failed to save market value settings: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

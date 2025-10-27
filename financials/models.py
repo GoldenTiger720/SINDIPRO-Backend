@@ -323,3 +323,34 @@ class AccountBalance(models.Model):
 
     def __str__(self):
         return f"{self.building.building_name} - {self.account_name} - {self.reference_month}: R$ {self.balance}"
+
+
+class MarketValueSetting(models.Model):
+    """
+    Market value settings for condominium fee comparison.
+    Stores the min/max values for sale, rental, and condominium fees per m².
+    Only one record per building (update if exists, create if not).
+    """
+    building = models.OneToOneField(Building, on_delete=models.CASCADE, related_name='market_value_setting')
+
+    # Sale values (R$/m²)
+    sale_min = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    sale_max = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Rental values (R$/m²)
+    rental_min = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    rental_max = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    # Condominium values (R$/m²)
+    condominium_min = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    condominium_max = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'financials_market_value_setting'
+
+    def __str__(self):
+        return f"{self.building.building_name} - Market Value Settings"

@@ -35,4 +35,7 @@ urlpatterns = [
 
     # Account monthly data for budget evolution
     path('account-monthly-data/', views.account_monthly_data_view, name='account_monthly_data'),
+
+    # Market value settings
+    path('market/setting/', views.market_value_setting_view, name='market_value_setting'),
 ]
