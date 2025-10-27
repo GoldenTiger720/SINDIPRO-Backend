@@ -81,7 +81,7 @@ class ConsumptionRegister(models.Model):
     building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='consumption_registers', null=True, blank=True)
     date = models.DateField()
     utility_type = models.CharField(max_length=20, choices=UTILITY_TYPE_CHOICES)
-    value = models.DecimalField(max_digits=10, decimal_places=2)
+    value = models.DecimalField(max_digits=10, decimal_places=3)
     sub_account = models.ForeignKey('SubAccount', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumption_registers')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
