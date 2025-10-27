@@ -27,6 +27,42 @@ def consumption_register(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def consumption_register_detail(request, register_id):
+    """
+    GET: Retrieve a specific consumption register entry.
+    PUT: Update a specific consumption register entry.
+    DELETE: Delete a specific consumption register entry.
+    """
+    try:
+        register = ConsumptionRegister.objects.select_related('sub_account').get(id=register_id)
+    except ConsumptionRegister.DoesNotExist:
+        return Response({
+            'error': 'Consumption register not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = ConsumptionRegisterSerializer(register)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'PUT':
+        serializer = ConsumptionRegisterSerializer(register, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({
+            'error': 'Invalid data',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        register.delete()
+        return Response({
+            'message': 'Consumption register deleted successfully'
+        }, status=status.HTTP_200_OK)
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def consumption_account(request):
