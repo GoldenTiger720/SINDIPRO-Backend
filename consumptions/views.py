@@ -77,19 +77,55 @@ def consumption_account(request):
     """
     GET: Retrieve all consumption account entries.
     POST: Create a new consumption account entry.
-    Expected POST data: {amount, month, paymentDate, utilityType}
+    Expected POST data: {amount, month, utilityType}
     """
     if request.method == 'GET':
         accounts = ConsumptionAccount.objects.all()
         serializer = ConsumptionAccountSerializer(accounts, many=True)
         return Response(serializer.data)
-    
+
     elif request.method == 'POST':
         serializer = ConsumptionAccountSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def consumption_account_detail(request, account_id):
+    """
+    GET: Retrieve a specific consumption account entry.
+    PUT: Update a specific consumption account entry.
+    DELETE: Delete a specific consumption account entry.
+    """
+    try:
+        account = ConsumptionAccount.objects.get(id=account_id)
+    except ConsumptionAccount.DoesNotExist:
+        return Response({
+            'error': 'Consumption account not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = ConsumptionAccountSerializer(account)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'PUT':
+        serializer = ConsumptionAccountSerializer(account, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({
+            'error': 'Invalid data',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        account.delete()
+        return Response({
+            'message': 'Consumption account deleted successfully'
+        }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET', 'POST'])

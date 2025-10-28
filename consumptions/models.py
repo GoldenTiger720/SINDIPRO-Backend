@@ -104,7 +104,8 @@ class ConsumptionAccount(models.Model):
     month = models.CharField(max_length=7)  # Format: YYYY-MM
     utility_type = models.CharField(max_length=20, choices=UTILITY_TYPE_CHOICES)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_date = models.DateField()
+    payment_date = models.DateField(null=True, blank=True)  # Made optional
+    is_paid = models.BooleanField(default=False)  # Track payment status
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

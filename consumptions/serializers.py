@@ -39,11 +39,12 @@ class ConsumptionRegisterSerializer(serializers.ModelSerializer):
 
 class ConsumptionAccountSerializer(serializers.ModelSerializer):
     utilityType = serializers.CharField(source='utility_type')
-    paymentDate = serializers.DateField(source='payment_date')
+    paymentDate = serializers.DateField(source='payment_date', required=False, allow_null=True)
+    isPaid = serializers.BooleanField(source='is_paid', required=False)
 
     class Meta:
         model = ConsumptionAccount
-        fields = ['id', 'month', 'utilityType', 'amount', 'paymentDate', 'created_at', 'updated_at']
+        fields = ['id', 'month', 'utilityType', 'amount', 'paymentDate', 'isPaid', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
     def to_internal_value(self, data):
@@ -55,6 +56,9 @@ class ConsumptionAccountSerializer(serializers.ModelSerializer):
 
         if 'paymentDate' in data:
             internal_data['payment_date'] = data['paymentDate']
+
+        if 'isPaid' in data:
+            internal_data['is_paid'] = data['isPaid']
 
         return super().to_internal_value(internal_data)
 
