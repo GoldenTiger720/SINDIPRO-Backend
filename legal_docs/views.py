@@ -4,8 +4,14 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from .models import LegalDocument, LegalObligation, LegalTemplate
-from .serializers import LegalDocumentSerializer, LegalObligationSerializer, LegalTemplateSerializer
+from .models import LegalDocument, LegalObligation, LegalTemplate, LegalObligationCompletion
+from .serializers import (
+    LegalDocumentSerializer,
+    LegalObligationSerializer,
+    LegalTemplateSerializer,
+    LegalObligationCompletionSerializer,
+    MarkCompletionSerializer
+)
 from .tasks import send_legal_obligation_notification
 from datetime import datetime, timedelta
 from django_celery_beat.models import PeriodicTask, CrontabSchedule
@@ -145,3 +151,106 @@ def update_delete_legal_template(request, template_id):
             'message': 'Legal template deleted successfully',
             'template_name': template_name
         }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_obligation_completed(request, template_id):
+    """
+    Mark a legal obligation as completed and calculate the next due date.
+    """
+    try:
+        template = get_object_or_404(LegalTemplate, id=template_id, created_by=request.user)
+    except LegalTemplate.DoesNotExist:
+        return Response({
+            'error': 'Template not found or you do not have permission to access it'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = MarkCompletionSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response({
+            'error': 'Invalid data',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    validated_data = serializer.validated_data
+    completion_date = validated_data['completion_date']
+    notes = validated_data.get('notes', '')
+    actual_cost = validated_data.get('actual_cost')
+
+    # Store previous due date
+    previous_due_date = template.due_month
+
+    # Calculate next due date based on completion date and frequency
+    next_due_date = template.calculate_next_due_date(completion_date)
+
+    # Create completion record
+    completion = LegalObligationCompletion.objects.create(
+        template=template,
+        completion_date=completion_date,
+        previous_due_date=previous_due_date,
+        new_due_date=next_due_date,
+        notes=notes,
+        actual_cost=actual_cost,
+        completed_by=request.user
+    )
+
+    # Update template with new due date and completion info
+    template.last_completion_date = completion_date
+    template.status = 'pending'  # Reset to pending for next cycle
+    if next_due_date:
+        template.due_month = next_due_date
+    template.save()
+
+    # Reschedule notification if there's a next due date
+    if next_due_date and template.notice_period and template.responsible_emails:
+        schedule_notification_email(template)
+
+    completion_serializer = LegalObligationCompletionSerializer(completion)
+
+    return Response({
+        'message': 'Obligation marked as completed successfully',
+        'completion': completion_serializer.data,
+        'new_due_date': next_due_date.isoformat() if next_due_date else None
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_completion_history(request, template_id):
+    """
+    Get completion history for a specific legal obligation template.
+    """
+    try:
+        template = get_object_or_404(LegalTemplate, id=template_id, created_by=request.user)
+    except LegalTemplate.DoesNotExist:
+        return Response({
+            'error': 'Template not found or you do not have permission to access it'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    completions = LegalObligationCompletion.objects.filter(template=template)
+    serializer = LegalObligationCompletionSerializer(completions, many=True)
+
+    return Response({
+        'template_id': template_id,
+        'template_name': template.name,
+        'completions': serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_completions(request):
+    """
+    Get all completion history for all templates of the authenticated user.
+    """
+    templates = LegalTemplate.objects.filter(created_by=request.user)
+    completions = LegalObligationCompletion.objects.filter(
+        template__in=templates
+    ).select_related('template', 'completed_by')
+
+    serializer = LegalObligationCompletionSerializer(completions, many=True)
+
+    return Response({
+        'completions': serializer.data
+    }, status=status.HTTP_200_OK)

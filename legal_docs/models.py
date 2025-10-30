@@ -100,6 +100,12 @@ class LegalTemplate(models.Model):
         ('industrial', 'Industrial'),
     ]
 
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('overdue', 'Overdue'),
+    ]
+
     name = models.CharField(max_length=200)
     description = models.TextField()
     building = models.ForeignKey(Building, on_delete=models.CASCADE, null=True, blank=True)
@@ -112,9 +118,56 @@ class LegalTemplate(models.Model):
     notice_period = models.IntegerField(default=14, help_text="Notice period in days")
     responsible_emails = models.TextField(blank=True, help_text="Comma-separated email addresses")
 
+    # Completion tracking fields
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    last_completion_date = models.DateField(null=True, blank=True, help_text="Date when obligation was last completed")
+
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return self.name
+
+    @property
+    def is_overdue(self):
+        if self.due_month and self.status != 'completed':
+            from django.utils import timezone
+            return self.due_month < timezone.now().date()
+        return False
+
+    def calculate_next_due_date(self, completion_date):
+        """Calculate next due date based on completion date and frequency"""
+        from dateutil.relativedelta import relativedelta
+
+        frequency_map = {
+            'annual': relativedelta(years=1),
+            'biannual': relativedelta(months=6),
+            'quarterly': relativedelta(months=3),
+            'monthly': relativedelta(months=1),
+            'one_time': None
+        }
+
+        delta = frequency_map.get(self.frequency)
+        if delta:
+            return completion_date + delta
+        return None
+
+
+class LegalObligationCompletion(models.Model):
+    """Track completion history for legal obligation templates"""
+    template = models.ForeignKey(LegalTemplate, on_delete=models.CASCADE, related_name='completions')
+    completion_date = models.DateField()
+    previous_due_date = models.DateField(null=True, blank=True)
+    new_due_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    actual_cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    completed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-completion_date']
+
+    def __str__(self):
+        return f"{self.template.name} - Completed on {self.completion_date}"

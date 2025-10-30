@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import LegalDocument, LegalObligation, LegalTemplate
+from .models import LegalDocument, LegalObligation, LegalTemplate, LegalObligationCompletion
 
 
 @admin.register(LegalDocument)
@@ -20,7 +20,16 @@ class LegalObligationAdmin(admin.ModelAdmin):
 
 @admin.register(LegalTemplate)
 class LegalTemplateAdmin(admin.ModelAdmin):
-    list_display = ['name', 'frequency', 'active', 'building_type', 'requires_quote', 'due_month', 'created_at']
-    list_filter = ['active', 'frequency', 'requires_quote', 'building_type', 'due_month']
+    list_display = ['name', 'frequency', 'active', 'status', 'building_type', 'requires_quote', 'due_month', 'last_completion_date', 'created_at']
+    list_filter = ['active', 'status', 'frequency', 'requires_quote', 'building_type', 'due_month']
     search_fields = ['name', 'description', 'conditions', 'responsible_emails']
     readonly_fields = ['created_at', 'updated_at', 'created_by']
+
+
+@admin.register(LegalObligationCompletion)
+class LegalObligationCompletionAdmin(admin.ModelAdmin):
+    list_display = ['template', 'completion_date', 'previous_due_date', 'new_due_date', 'completed_by', 'created_at']
+    list_filter = ['completion_date', 'template']
+    search_fields = ['template__name', 'notes']
+    readonly_fields = ['created_at', 'completed_by']
+    date_hierarchy = 'completion_date'
