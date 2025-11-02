@@ -44,8 +44,9 @@ class Equipment(models.Model):
     purchase_date = models.DateField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='operational')
     maintenance_frequency = models.CharField(max_length=20, choices=MAINTENANCE_FREQUENCY_CHOICES, default='monthly')
-    contractor_name = models.CharField(max_length=200)
-    contractor_phone = models.CharField(max_length=20)
+    company_name = models.CharField(max_length=200)
+    company_phone = models.CharField(max_length=20)
+    contact_person_name = models.CharField(max_length=200, blank=True, null=True)
     
     # Keep some useful existing fields
     

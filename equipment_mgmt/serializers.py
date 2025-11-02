@@ -12,8 +12,9 @@ class MaintenanceRecordSerializer(serializers.ModelSerializer):
 
 
 class EquipmentSerializer(serializers.ModelSerializer):
-    contractorName = serializers.CharField(source='contractor_name')
-    contractorPhone = serializers.CharField(source='contractor_phone')
+    companyName = serializers.CharField(source='company_name')
+    companyPhone = serializers.CharField(source='company_phone')
+    contactPersonName = serializers.CharField(source='contact_person_name', allow_blank=True, required=False)
     maintenanceFrequency = serializers.CharField(source='maintenance_frequency')
     purchaseDate = serializers.DateField(source='purchase_date')
     building_id = serializers.CharField()
@@ -29,8 +30,9 @@ class EquipmentSerializer(serializers.ModelSerializer):
             'purchaseDate',
             'status',
             'maintenanceFrequency',
-            'contractorName',
-            'contractorPhone',
+            'companyName',
+            'companyPhone',
+            'contactPersonName',
             'created_at',
             'updated_at'
         ]
@@ -42,8 +44,9 @@ class EquipmentSerializer(serializers.ModelSerializer):
 
 
 class EquipmentWithMaintenanceSerializer(serializers.ModelSerializer):
-    contractorName = serializers.CharField(source='contractor_name')
-    contractorPhone = serializers.CharField(source='contractor_phone')
+    companyName = serializers.CharField(source='company_name')
+    companyPhone = serializers.CharField(source='company_phone')
+    contactPersonName = serializers.CharField(source='contact_person_name', allow_blank=True, required=False)
     maintenanceFrequency = serializers.CharField(source='maintenance_frequency')
     purchaseDate = serializers.DateField(source='purchase_date')
     building_id = serializers.CharField()
@@ -60,8 +63,9 @@ class EquipmentWithMaintenanceSerializer(serializers.ModelSerializer):
             'purchaseDate',
             'status',
             'maintenanceFrequency',
-            'contractorName',
-            'contractorPhone',
+            'companyName',
+            'companyPhone',
+            'contactPersonName',
             'created_at',
             'updated_at',
             'maintenanceRecords'
