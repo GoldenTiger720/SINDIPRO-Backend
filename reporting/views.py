@@ -62,10 +62,12 @@ def create_chart(chart_type, data, title, xlabel, ylabel, figsize=(6, 4), colors
     # Prevent font fallback and use DejaVu Sans (default font present on server)
     matplotlib.rcParams['font.family'] = 'DejaVu Sans'
     matplotlib.rcParams['axes.unicode_minus'] = False
+    # Optimize for speed
+    matplotlib.rcParams['figure.max_open_warning'] = 0
 
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=figsize)
+    fig, ax = plt.subplots(figsize=figsize, dpi=100)  # Lower DPI for faster generation
 
     if chart_type == 'bar':
         x_labels = [str(item[0])[:15] for item in data]  # Truncate long labels
@@ -95,9 +97,9 @@ def create_chart(chart_type, data, title, xlabel, ylabel, figsize=(6, 4), colors
     ax.set_title(title, fontsize=12, fontweight='bold', pad=15)
     plt.tight_layout()
 
-    # Save to BytesIO
+    # Save to BytesIO with optimized DPI for faster generation
     img_buffer = BytesIO()
-    plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
+    plt.savefig(img_buffer, format='png', dpi=100, bbox_inches='tight')
     img_buffer.seek(0)
 
     # Mandatory graph clearing to prevent memory leaks
