@@ -7,11 +7,6 @@ from django.db.models import Sum, Count, Avg, Q
 from django.utils import timezone
 from datetime import datetime, timedelta
 from io import BytesIO
-import matplotlib
-matplotlib.use('Agg')  # Use non-GUI backend
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from matplotlib.patches import Patch
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -60,6 +55,11 @@ class NumberedCanvas(canvas.Canvas):
 
 def create_chart(chart_type, data, title, xlabel, ylabel, figsize=(6, 4), colors_list=None):
     """Create matplotlib charts and return as Image"""
+    # Lazy import matplotlib to avoid loading on module import
+    import matplotlib
+    matplotlib.use('Agg')  # Use non-GUI backend
+    import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=figsize)
 
     if chart_type == 'bar':
