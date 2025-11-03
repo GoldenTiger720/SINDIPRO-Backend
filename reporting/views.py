@@ -58,6 +58,11 @@ def create_chart(chart_type, data, title, xlabel, ylabel, figsize=(6, 4), colors
     # Lazy import matplotlib to avoid loading on module import
     import matplotlib
     matplotlib.use('Agg')  # Use non-GUI backend
+
+    # Prevent font fallback and use DejaVu Sans (default font present on server)
+    matplotlib.rcParams['font.family'] = 'DejaVu Sans'
+    matplotlib.rcParams['axes.unicode_minus'] = False
+
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=figsize)
@@ -94,7 +99,9 @@ def create_chart(chart_type, data, title, xlabel, ylabel, figsize=(6, 4), colors
     img_buffer = BytesIO()
     plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight')
     img_buffer.seek(0)
-    plt.close()
+
+    # Mandatory graph clearing to prevent memory leaks
+    plt.close(fig)
 
     return Image(img_buffer, width=4.5*inch, height=3*inch)
 
