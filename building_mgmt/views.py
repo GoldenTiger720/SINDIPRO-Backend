@@ -581,9 +581,22 @@ def import_units_excel(request, id):
                     except (ValueError, TypeError):
                         area = 0.0
 
-                    # Handle ideal_fraction conversion
+                    # Handle ideal_fraction conversion - store EXACT value from Excel without any conversion
+                    # Do NOT divide or multiply - store the raw value as-is
                     try:
-                        ideal_fraction = float(row_data[5]) if row_data[5] is not None else 0.0
+                        if row_data[5] is not None:
+                            # Get the raw value from Excel cell
+                            raw_value = row_data[5]
+
+                            # If it's a string, remove % sign if present and convert to float
+                            if isinstance(raw_value, str):
+                                raw_value = raw_value.strip().replace('%', '').replace(',', '.')
+                                print(raw_value)
+
+                            # Store the exact value read from Excel - no division, no multiplication
+                            ideal_fraction = float(raw_value)
+                        else:
+                            ideal_fraction = 0.0
                     except (ValueError, TypeError):
                         ideal_fraction = 0.0
 
