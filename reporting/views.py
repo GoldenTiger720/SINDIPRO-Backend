@@ -2036,40 +2036,66 @@ def generate_report(request):
         ))
         story.append(PageBreak())
 
-        # Generate sections based on user selection
-        if sections.get('building_info'):
-            story.extend(generate_building_section(building, start_date, end_date))
+        # NEW VISUAL REPORT STRUCTURE - CHARTS ONLY, 6 SECTIONS
+        # Removed tables, focus on visual chart-based presentation
 
-        if sections.get('equipment'):
-            story.extend(generate_equipment_section(building, start_date, end_date))
+        # Import new visual functions
+        from reporting.new_visual_sections import (
+            generate_financial_charts,
+            generate_consumption_charts,
+            generate_legal_visual,
+            generate_unit_overview,
+            generate_service_requests_visual,
+            generate_calendar_visual
+        )
 
+        # 1. FINANCIAL CHARTS (Overall performance, by account, market comparison)
         if sections.get('financial'):
-            story.extend(generate_financial_section(building, start_date, end_date))
+            story.extend(generate_financial_charts(building, start_date, end_date))
 
+            # Add financial justifications if conclusion provided
+            if conclusion and conclusion.strip():
+                story.append(Spacer(1, 0.3*inch))
+                story.append(create_subsection_header('Financial Analysis - Justifications'))
+                story.append(Spacer(1, 0.1*inch))
+
+                conclusion_paragraphs = conclusion.strip().split('\n')
+                for para in conclusion_paragraphs:
+                    if para.strip():
+                        story.append(create_normal_paragraph(para.strip()))
+                        story.append(Spacer(1, 0.1*inch))
+
+        # 2. CONSUMPTION CHARTS (Consumption vs Payments indicators)
         if sections.get('consumption'):
-            story.extend(generate_consumption_section(building, start_date, end_date))
+            story.extend(generate_consumption_charts(building, start_date, end_date))
 
+            # Add consumption justifications if conclusion provided
+            if conclusion and conclusion.strip():
+                story.append(Spacer(1, 0.3*inch))
+                story.append(create_subsection_header('Consumption Analysis - Justifications'))
+                story.append(Spacer(1, 0.1*inch))
+
+                conclusion_paragraphs = conclusion.strip().split('\n')
+                for para in conclusion_paragraphs:
+                    if para.strip():
+                        story.append(create_normal_paragraph(para.strip()))
+                        story.append(Spacer(1, 0.1*inch))
+
+        # 3. LEGAL OBLIGATIONS (Visual, modern, colorful)
         if sections.get('legal_obligations'):
-            story.extend(generate_legal_obligations_section(building, start_date, end_date))
+            story.extend(generate_legal_visual(building, start_date, end_date))
 
+        # 4. UNIT OVERVIEW (Numbers, area, rental/sale/fee with min/max limits)
+        if sections.get('building_info'):
+            story.extend(generate_unit_overview(building))
+
+        # 5. OPEN SERVICE REQUESTS (Consolidated, readable format)
         if sections.get('field_management'):
-            story.extend(generate_field_management_section(building, start_date, end_date))
+            story.extend(generate_service_requests_visual(building, start_date, end_date))
 
+        # 6. MEETINGS AND SCHEDULED COMMITMENTS (Integrated format)
         if sections.get('calendar'):
-            story.extend(generate_calendar_section(building, start_date, end_date))
-
-        # Add conclusion/justifications section if provided
-        if conclusion and conclusion.strip():
-            story.append(PageBreak())
-            story.append(create_section_header('Conclusion & Justifications', '#6610f2'))
-            story.append(Spacer(1, 0.15*inch))
-
-            # Split conclusion into paragraphs (by newlines)
-            conclusion_paragraphs = conclusion.strip().split('\n')
-            for para in conclusion_paragraphs:
-                if para.strip():
-                    story.append(create_normal_paragraph(para.strip()))
-                    story.append(Spacer(1, 0.1*inch))
+            story.extend(generate_calendar_visual(building, start_date, end_date))
 
         # Build PDF
         doc.build(story, canvasmaker=NumberedCanvas)
