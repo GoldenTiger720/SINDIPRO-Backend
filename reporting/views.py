@@ -1957,6 +1957,7 @@ def generate_report(request):
         start_date_str = request.data.get('start_date')
         end_date_str = request.data.get('end_date')
         sections = request.data.get('sections', {})
+        conclusion = request.data.get('conclusion', '')
 
         # Validate required fields
         if not all([building_id, start_date_str, end_date_str]):
@@ -2056,6 +2057,19 @@ def generate_report(request):
 
         if sections.get('calendar'):
             story.extend(generate_calendar_section(building, start_date, end_date))
+
+        # Add conclusion/justifications section if provided
+        if conclusion and conclusion.strip():
+            story.append(PageBreak())
+            story.append(create_section_header('Conclusion & Justifications', '#6610f2'))
+            story.append(Spacer(1, 0.15*inch))
+
+            # Split conclusion into paragraphs (by newlines)
+            conclusion_paragraphs = conclusion.strip().split('\n')
+            for para in conclusion_paragraphs:
+                if para.strip():
+                    story.append(create_normal_paragraph(para.strip()))
+                    story.append(Spacer(1, 0.1*inch))
 
         # Build PDF
         doc.build(story, canvasmaker=NumberedCanvas)
