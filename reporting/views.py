@@ -1957,7 +1957,7 @@ def generate_report(request):
         start_date_str = request.data.get('start_date')
         end_date_str = request.data.get('end_date')
         sections = request.data.get('sections', {})
-        conclusion = request.data.get('conclusion', '')
+        conclusions = request.data.get('conclusions', {})
 
         # Validate required fields
         if not all([building_id, start_date_str, end_date_str]):
@@ -2036,6 +2036,20 @@ def generate_report(request):
         ))
         story.append(PageBreak())
 
+        # Helper function to add section-specific justifications
+        def add_section_justifications(section_name, conclusion_text):
+            """Add justification paragraphs for a section if provided"""
+            if conclusion_text and conclusion_text.strip():
+                story.append(Spacer(1, 0.3*inch))
+                story.append(create_subsection_header(f'{section_name} - Justifications'))
+                story.append(Spacer(1, 0.1*inch))
+
+                conclusion_paragraphs = conclusion_text.strip().split('\n')
+                for para in conclusion_paragraphs:
+                    if para.strip():
+                        story.append(create_normal_paragraph(para.strip()))
+                        story.append(Spacer(1, 0.1*inch))
+
         # NEW VISUAL REPORT STRUCTURE - CHARTS ONLY, 6 SECTIONS
         # Removed tables, focus on visual chart-based presentation
 
@@ -2049,53 +2063,44 @@ def generate_report(request):
             generate_calendar_visual
         )
 
-        # 1. FINANCIAL CHARTS (Overall performance, by account, market comparison)
-        if sections.get('financial'):
-            story.extend(generate_financial_charts(building, start_date, end_date))
-
-            # Add financial justifications if conclusion provided
-            if conclusion and conclusion.strip():
-                story.append(Spacer(1, 0.3*inch))
-                story.append(create_subsection_header('Financial Analysis - Justifications'))
-                story.append(Spacer(1, 0.1*inch))
-
-                conclusion_paragraphs = conclusion.strip().split('\n')
-                for para in conclusion_paragraphs:
-                    if para.strip():
-                        story.append(create_normal_paragraph(para.strip()))
-                        story.append(Spacer(1, 0.1*inch))
-
-        # 2. CONSUMPTION CHARTS (Consumption vs Payments indicators)
-        if sections.get('consumption'):
-            story.extend(generate_consumption_charts(building, start_date, end_date))
-
-            # Add consumption justifications if conclusion provided
-            if conclusion and conclusion.strip():
-                story.append(Spacer(1, 0.3*inch))
-                story.append(create_subsection_header('Consumption Analysis - Justifications'))
-                story.append(Spacer(1, 0.1*inch))
-
-                conclusion_paragraphs = conclusion.strip().split('\n')
-                for para in conclusion_paragraphs:
-                    if para.strip():
-                        story.append(create_normal_paragraph(para.strip()))
-                        story.append(Spacer(1, 0.1*inch))
-
-        # 3. LEGAL OBLIGATIONS (Visual, modern, colorful)
-        if sections.get('legal_obligations'):
-            story.extend(generate_legal_visual(building, start_date, end_date))
-
-        # 4. UNIT OVERVIEW (Numbers, area, rental/sale/fee with min/max limits)
+        # 1. BUILDING INFORMATION / UNIT OVERVIEW (Numbers, area, rental/sale/fee with min/max limits)
         if sections.get('building_info'):
             story.extend(generate_unit_overview(building))
+            add_section_justifications('Building Information', conclusions.get('building_info', ''))
 
-        # 5. OPEN SERVICE REQUESTS (Consolidated, readable format)
+        # 2. EQUIPMENT (placeholder for equipment section)
+        if sections.get('equipment'):
+            story.append(create_section_header('Equipment Information'))
+            story.append(Spacer(1, 0.2*inch))
+            story.append(create_normal_paragraph('Equipment section implementation pending.'))
+            story.append(Spacer(1, 0.2*inch))
+            add_section_justifications('Equipment', conclusions.get('equipment', ''))
+            story.append(PageBreak())
+
+        # 3. FINANCIAL CHARTS (Overall performance, by account, market comparison)
+        if sections.get('financial'):
+            story.extend(generate_financial_charts(building, start_date, end_date))
+            add_section_justifications('Financial Analysis', conclusions.get('financial', ''))
+
+        # 4. CONSUMPTION CHARTS (Consumption vs Payments indicators)
+        if sections.get('consumption'):
+            story.extend(generate_consumption_charts(building, start_date, end_date))
+            add_section_justifications('Consumption Analysis', conclusions.get('consumption', ''))
+
+        # 5. LEGAL OBLIGATIONS (Visual, modern, colorful)
+        if sections.get('legal_obligations'):
+            story.extend(generate_legal_visual(building, start_date, end_date))
+            add_section_justifications('Legal Obligations', conclusions.get('legal_obligations', ''))
+
+        # 6. OPEN SERVICE REQUESTS (Consolidated, readable format)
         if sections.get('field_management'):
             story.extend(generate_service_requests_visual(building, start_date, end_date))
+            add_section_justifications('Service Requests', conclusions.get('field_management', ''))
 
-        # 6. MEETINGS AND SCHEDULED COMMITMENTS (Integrated format)
+        # 7. MEETINGS AND SCHEDULED COMMITMENTS (Integrated format)
         if sections.get('calendar'):
             story.extend(generate_calendar_visual(building, start_date, end_date))
+            add_section_justifications('Calendar', conclusions.get('calendar', ''))
 
         # Build PDF
         doc.build(story, canvasmaker=NumberedCanvas)
