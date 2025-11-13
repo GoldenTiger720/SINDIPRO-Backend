@@ -16,142 +16,348 @@ from reporting.views import (
 
 def generate_financial_charts(building, start_date, end_date):
     """
-    VISUAL Financial Section - CHARTS ONLY
-    1. Overall financial performance chart
-    2. Individual account performance charts
-    3. Condominium fee vs market comparison chart
+    COMPREHENSIVE Financial Section - Mirrors frontend Financial page exactly
+    1. General Report Tab: Monthly Evolution chart
+    2. By Account Tab: Individual account charts
+    3. Market Tab: Market values comparison chart + Detailed unit analysis table
     """
     from financials.models import (
         FinancialMainAccount, FinancialAccountTransaction,
         MarketValueSetting
     )
+    from financials.serializers import FinancialReportSerializer
     from building_mgmt.models import Unit
     from datetime import datetime
     from decimal import Decimal
+    from collections import defaultdict
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Table, TableStyle
+    from reportlab.lib import colors
 
     elements = []
 
     # Section Header
-    from reportlab.lib.units import inch
     elements.append(PageBreak())
     elements.append(create_section_header('1. Financial Performance Analysis', '#ffc107'))
     elements.append(Spacer(1, 0.2*inch))
 
-    # Get financial data
-    accounts = FinancialMainAccount.objects.filter(building=building).order_by('code')
-
+    # Get report data using the same serializer as frontend
     start_month = start_date.strftime('%Y-%m')
     end_month = end_date.strftime('%Y-%m')
 
-    transactions = FinancialAccountTransaction.objects.filter(
-        building=building,
-        reference_month__gte=start_month,
-        reference_month__lte=end_month
-    ).select_related('account')
+    serializer_data = {
+        'building_id': building.id,
+        'fiscal_year_start': start_month,
+        'fiscal_year_end': end_month
+    }
 
-    # Chart 1: Overall Financial Performance (Budget vs Actual)
-    if accounts.exists() and transactions.exists():
-        total_budget = float(accounts.aggregate(Sum('expected_amount'))['expected_amount__sum'] or 0)
-        total_actual = float(transactions.aggregate(Sum('amount'))['amount__sum'] or 0)
+    serializer = FinancialReportSerializer(serializer_data)
+    report_data = serializer.to_representation(serializer_data)
 
-        if total_budget > 0 or total_actual > 0:
-            elements.append(create_subsection_header('Overall Financial Performance'))
-            chart_data = [
-                ('Budgeted', total_budget),
-                ('Actual Spent', total_actual)
-            ]
-            chart = create_chart('bar', chart_data,
-                               'Budget vs Actual Expenses',
-                               'Category', 'Amount (R$)',
-                               colors_list=['#28a745', '#dc3545'])
-            elements.append(chart)
-            elements.append(Spacer(1, 0.3*inch))
+    # ==================================================================
+    # TAB 1: GENERAL REPORT - MONTHLY EVOLUTION
+    # ==================================================================
+    elements.append(create_subsection_header('General Report - Monthly Evolution'))
+    elements.append(Spacer(1, 0.1*inch))
 
-            # Variance info
-            variance = total_actual - total_budget
-            variance_pct = (variance / total_budget * 100) if total_budget > 0 else 0
+    monthly_data = report_data.get('monthlyData', [])
+    total_revenue = report_data.get('totalPlannedRevenue', 0)
+    total_expense = sum(float(m.get('totalExpense', 0)) for m in monthly_data)
+    balance = total_revenue - total_expense
 
-            status_text = "WITHIN BUDGET" if variance <= 0 else "OVER BUDGET"
-            status_color = '#28a745' if variance <= 0 else '#dc3545'
+    if monthly_data:
+        # Summary Cards Text
+        elements.append(create_normal_paragraph(
+            f"<b>Total Revenue:</b> <font color='#28a745'>R$ {total_revenue:,.2f}</font> | "
+            f"<b>Total Expenses:</b> <font color='#dc3545'>R$ {total_expense:,.2f}</font> | "
+            f"<b>Balance:</b> <font color='{'#17a2b8' if balance >= 0 else '#dc3545'}'>R$ {balance:,.2f}</font>"
+        ))
+        elements.append(Spacer(1, 0.2*inch))
+
+        # Calculate projection (same logic as frontend)
+        completed_months = sum(1 for m in monthly_data if float(m.get('totalExpense', 0)) > 0)
+        if completed_months > 0 and total_revenue > 0:
+            avg_monthly_spending = total_expense / completed_months
+            total_months = len(monthly_data)
+            projected_annual = avg_monthly_spending * total_months
+            percentage = ((projected_annual / total_revenue) * 100) - 100
+
+            # Determine flag
+            if projected_annual <= total_revenue:
+                flag = 'green'
+                flag_text = '🟢 On Track: Current spending pace is within budget.'
+                flag_color = '#28a745'
+            elif percentage <= 20:
+                flag = 'yellow'
+                flag_text = f'🟡 Caution: Projected to exceed budget by {abs(percentage):.1f}%. Monitoring required.'
+                flag_color = '#ffc107'
+            else:
+                flag = 'red'
+                flag_text = f'🔴 Warning: Projected to exceed budget by {abs(percentage):.1f}%. Corrective action needed.'
+                flag_color = '#dc3545'
 
             elements.append(create_normal_paragraph(
-                f"<b>Budget Status:</b> <font color='{status_color}'>{status_text}</font> | "
-                f"<b>Variance:</b> R$ {abs(variance):,.2f} ({abs(variance_pct):.1f}%)"
+                f"<font color='{flag_color}'><b>{flag_text}</b></font> (Based on {completed_months} completed months)"
             ))
-            elements.append(Spacer(1, 0.4*inch))
+            elements.append(Spacer(1, 0.2*inch))
 
-    # Chart 2: Top 5 Accounts by Spending
-    if transactions.exists():
-        from collections import defaultdict
-        account_totals = defaultdict(float)
+        # Total Comparison Bar Chart (frontend shows Total Revenue vs Total Expenses)
+        chart_data = [
+            ('Total Revenue', total_revenue),
+            ('Total Expenses', total_expense)
+        ]
+        chart = create_chart('bar', chart_data,
+                           'Total Comparison',
+                           '', 'Amount (R$)',
+                           colors_list=['#10b981', '#ef4444'])
+        elements.append(chart)
+        elements.append(Spacer(1, 0.3*inch))
 
-        for trans in transactions:
-            account_totals[trans.account.name] += float(trans.amount)
+    # ==================================================================
+    # TAB 2: BY ACCOUNT - INDIVIDUAL ACCOUNT CHARTS
+    # ==================================================================
+    accounts_data = report_data.get('accountsData', [])
 
-        # Get top 5
-        top_accounts = sorted(account_totals.items(), key=lambda x: x[1], reverse=True)[:5]
+    if accounts_data:
+        elements.append(PageBreak())
+        elements.append(create_subsection_header('By Account - Individual Performance'))
+        elements.append(Spacer(1, 0.2*inch))
 
-        if top_accounts:
-            elements.append(create_subsection_header('Top 5 Expense Categories'))
-            chart = create_chart('pie', top_accounts,
-                               'Expense Distribution by Account',
-                               '', '',
-                               colors_list=['#17a2b8', '#28a745', '#ffc107', '#dc3545', '#6610f2'])
-            elements.append(chart)
-            elements.append(Spacer(1, 0.3*inch))
+        for account_data in accounts_data[:10]:  # Limit to first 10 accounts to avoid overly long reports
+            account_code = account_data.get('accountCode', '')
+            account_name = account_data.get('accountName', '')
+            monthly_records = account_data.get('monthlyData', [])
 
-    # Chart 3: Condominium Fee vs Market Comparison
+            # Calculate totals
+            total_expected = sum(float(m.get('expectedAmount', 0)) for m in monthly_records)
+            total_actual = sum(float(m.get('actualAmount', 0)) for m in monthly_records)
+            account_balance = total_expected - total_actual
+
+            # Account header
+            elements.append(create_normal_paragraph(
+                f"<b><font color='#6b7280'>{account_code}</font> {account_name}</b>"
+            ))
+            elements.append(create_normal_paragraph(
+                f"<b>Expected:</b> <font color='#10b981'>R$ {total_expected:,.2f}</font> | "
+                f"<b>Actual:</b> <font color='#ef4444'>R$ {total_actual:,.2f}</font> | "
+                f"<b>Balance:</b> <font color='{'#17a2b8' if account_balance >= 0 else '#dc3545'}'>R$ {account_balance:+,.2f}</font>"
+            ))
+            elements.append(Spacer(1, 0.1*inch))
+
+            # Line chart with expected vs actual (frontend uses LineChart)
+            if len(monthly_records) > 0:
+                # Prepare data: list of (month, expected, actual) tuples
+                # matplotlib doesn't support multi-series directly in our create_chart
+                # So we'll create two separate series and overlay them
+
+                # For now, create a simple comparison showing months with values
+                chart_months = [m.get('month', '')[-5:] for m in monthly_records]  # Get MM-YY format
+                expected_values = [float(m.get('expectedAmount', 0)) for m in monthly_records]
+                actual_values = [float(m.get('actualAmount', 0)) for m in monthly_records]
+
+                # Create a dual-series line chart manually using matplotlib
+                import matplotlib
+                matplotlib.use('Agg')
+                matplotlib.rcParams['font.family'] = 'DejaVu Sans'
+                matplotlib.rcParams['axes.unicode_minus'] = False
+                import matplotlib.pyplot as plt
+                from io import BytesIO
+                from reportlab.platypus import Image
+
+                fig, ax = plt.subplots(figsize=(6, 3), dpi=100)
+                ax.plot(chart_months, expected_values, color='#10b981', linewidth=2, marker='o', label='Expected')
+                ax.plot(chart_months, actual_values, color='#ef4444', linewidth=2, marker='o', label='Actual')
+                ax.set_xlabel('Month')
+                ax.set_ylabel('Amount (R$)')
+                ax.set_title(f'{account_code} - Monthly Performance')
+                ax.legend()
+                ax.grid(True, alpha=0.3)
+                plt.xticks(rotation=45, ha='right')
+                plt.tight_layout()
+
+                # Convert to image
+                img_buffer = BytesIO()
+                fig.savefig(img_buffer, format='png', bbox_inches='tight')
+                img_buffer.seek(0)
+                plt.close(fig)
+
+                img = Image(img_buffer, width=6*inch, height=3*inch)
+                elements.append(img)
+                elements.append(Spacer(1, 0.3*inch))
+
+    # ==================================================================
+    # TAB 3: MARKET - MARKET VALUES COMPARISON CHART
+    # ==================================================================
     units = Unit.objects.filter(building=building)
+    accounts = FinancialMainAccount.objects.filter(building=building)
+
     if units.exists() and accounts.exists():
         try:
             market_settings = MarketValueSetting.objects.get(building=building)
 
-            # Calculate average condo fee per m²
+            elements.append(PageBreak())
+            elements.append(create_subsection_header('Market Values Comparison'))
+            elements.append(Spacer(1, 0.2*inch))
+
+            # Calculate average condo fee per m² (same logic as frontend)
             ordinary_budget = float(accounts.filter(balance_type='ordinary').aggregate(
                 Sum('expected_amount'))['expected_amount__sum'] or 0)
             total_area = float(units.aggregate(Sum('area'))['area__sum'] or 0)
+            total_ideal_fraction = float(units.aggregate(Sum('ideal_fraction'))['ideal_fraction__sum'] or 0)
 
+            # Calculate average condo fee per m² using the frontend formula
+            # Frontend: condoFeePerM2 = feeInfo.totalFee / ((totalAreaSum / 100) * idealFraction)
+            # Average across all units
+            avg_condo_fee_per_m2 = 0
             if total_area > 0:
-                avg_fee_per_sqm = ordinary_budget / total_area
-                market_min = float(market_settings.condominium_min)
-                market_max = float(market_settings.condominium_max)
-                market_avg = (market_min + market_max) / 2
+                # Simplified: ordinary_budget / total_area gives average fee per m²
+                # But frontend uses more complex formula with ideal fraction
+                # For consistency, let's use the exact frontend logic
+                unit_fees = []
+                for unit in units:
+                    area = float(unit.area)
+                    ideal_fraction = float(unit.ideal_fraction)
+                    if total_area > 0 and ideal_fraction > 0:
+                        # Calculate unit's total fee
+                        unit_total_fee = ordinary_budget * (ideal_fraction / 100)
+                        # Calculate fee per m² for this unit
+                        temp_var = (total_area / 100) * ideal_fraction
+                        if temp_var > 0:
+                            unit_fee_per_m2 = unit_total_fee / temp_var
+                            unit_fees.append(unit_fee_per_m2)
 
-                elements.append(PageBreak())
-                elements.append(create_subsection_header('Condominium Fee - Market Comparison'))
+                if unit_fees:
+                    avg_condo_fee_per_m2 = sum(unit_fees) / len(unit_fees)
 
-                chart_data = [
-                    ('Building Fee', avg_fee_per_sqm),
-                    ('Market Min', market_min),
-                    ('Market Average', market_avg),
-                    ('Market Max', market_max)
-                ]
+            condominium_min = float(market_settings.condominium_min)
+            condominium_max = float(market_settings.condominium_max)
 
-                chart = create_chart('bar', chart_data,
-                                   'Condominium Fee vs Market (R$/m²)',
-                                   'Category', 'R$ per m²',
-                                   colors_list=['#17a2b8', '#ffc107', '#28a745', '#dc3545'])
-                elements.append(chart)
-                elements.append(Spacer(1, 0.2*inch))
+            # Summary stats
+            elements.append(create_normal_paragraph(
+                f"<b>Total Monthly Collection:</b> R$ {ordinary_budget:,.2f} | "
+                f"<b>Total Units:</b> {units.count()} | "
+                f"<b>Avg Condo Fee/m²:</b> R$ {avg_condo_fee_per_m2:.2f}"
+            ))
+            elements.append(Spacer(1, 0.2*inch))
 
-                # Market position analysis
-                if avg_fee_per_sqm < market_min:
-                    status = "BELOW MARKET RANGE"
-                    color = '#28a745'
-                elif avg_fee_per_sqm > market_max:
-                    status = "ABOVE MARKET RANGE"
-                    color = '#dc3545'
-                else:
-                    status = "WITHIN MARKET RANGE"
-                    color = '#28a745'
+            # Market Values Comparison Chart (Area chart like frontend)
+            # Frontend shows 12 months with gray area between min/max and orange line for average
+            # Simplified for PDF: show the three values as bars
+            elements.append(create_normal_paragraph("<b>Market Values Comparison (R$/m²)</b>"))
+            elements.append(Spacer(1, 0.1*inch))
 
+            # Sort values to show range
+            values_list = [
+                ('Condominium Min', condominium_min),
+                ('Average Condo Fee', avg_condo_fee_per_m2),
+                ('Condominium Max', condominium_max)
+            ]
+            values_sorted = sorted(values_list, key=lambda x: x[1])
+
+            chart = create_chart('bar', values_sorted,
+                               'Market Values Comparison',
+                               '', 'R$/m²',
+                               colors_list=['#9ca3af', '#ff7300', '#6b7280'])
+            elements.append(chart)
+            elements.append(Spacer(1, 0.3*inch))
+
+            # ==================================================================
+            # TAB 3: MARKET - DETAILED UNIT ANALYSIS TABLE
+            # ==================================================================
+            elements.append(PageBreak())
+            elements.append(create_subsection_header('Detailed Unit Analysis'))
+            elements.append(Spacer(1, 0.2*inch))
+
+            # Prepare table data (same logic as frontend)
+            rental_min = float(market_settings.rental_min)
+            rental_max = float(market_settings.rental_max)
+            sale_min = float(market_settings.sale_min)
+            sale_max = float(market_settings.sale_max)
+
+            # Table header
+            table_data = [[
+                'Unit', 'Owner', 'Area', 'Ideal Fraction',
+                'Rental Min', 'Rental Max', 'Sale Min', 'Sale Max'
+            ]]
+
+            # Table rows
+            totals = {
+                'area': 0,
+                'ideal_fraction': 0,
+                'rental_min': 0,
+                'rental_max': 0,
+                'sale_min': 0,
+                'sale_max': 0
+            }
+
+            for unit in units[:50]:  # Limit to 50 units to avoid overly long tables
+                area = float(unit.area)
+                ideal_frac = float(unit.ideal_fraction)
+
+                # Calculate values (same as frontend logic)
+                unit_rental_min = area * rental_min
+                unit_rental_max = area * rental_max
+                unit_sale_min = area * sale_min
+                unit_sale_max = area * sale_max
+
+                table_data.append([
+                    unit.number,
+                    unit.owner or '-',
+                    f'{area:.2f}',
+                    f'{ideal_frac:.4f}%',
+                    f'R$ {unit_rental_min:,.2f}',
+                    f'R$ {unit_rental_max:,.2f}',
+                    f'R$ {unit_sale_min:,.2f}',
+                    f'R$ {unit_sale_max:,.2f}'
+                ])
+
+                # Accumulate totals
+                totals['area'] += area
+                totals['ideal_fraction'] += ideal_frac
+                totals['rental_min'] += unit_rental_min
+                totals['rental_max'] += unit_rental_max
+                totals['sale_min'] += unit_sale_min
+                totals['sale_max'] += unit_sale_max
+
+            # Add totals row
+            table_data.append([
+                'TOTAL', '',
+                f'{totals["area"]:.2f}',
+                f'{totals["ideal_fraction"]:.4f}%',
+                f'R$ {totals["rental_min"]:,.2f}',
+                f'R$ {totals["rental_max"]:,.2f}',
+                f'R$ {totals["sale_min"]:,.2f}',
+                f'R$ {totals["sale_max"]:,.2f}'
+            ])
+
+            # Create table
+            table = Table(table_data, colWidths=[0.7*inch, 1.2*inch, 0.7*inch, 0.9*inch, 1*inch, 1*inch, 1*inch, 1*inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f3f4f6')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e5e7eb')),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 1), (-1, -1), 7),
+                ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            elements.append(table)
+            elements.append(Spacer(1, 0.2*inch))
+
+            if units.count() > 50:
                 elements.append(create_normal_paragraph(
-                    f"<b>Market Position:</b> <font color='{color}'>{status}</font> | "
-                    f"<b>Building Fee:</b> R$ {avg_fee_per_sqm:.2f}/m² | "
-                    f"<b>Market Range:</b> R$ {market_min:.2f} - R$ {market_max:.2f}/m²"
+                    f"<i>Note: Showing first 50 units of {units.count()} total units.</i>"
                 ))
+
         except MarketValueSetting.DoesNotExist:
-            pass
+            elements.append(create_normal_paragraph(
+                "Market value settings not configured for this building."
+            ))
 
     return elements
 
