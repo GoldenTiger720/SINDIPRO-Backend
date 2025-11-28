@@ -19,7 +19,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(required=False, allow_blank=True, default='')
     last_name = serializers.CharField(required=False, allow_blank=True, default='')
     phone = serializers.CharField(required=False, allow_blank=True, default='')
-    role = serializers.CharField(required=False, default='readonly')
+    role = serializers.CharField(required=False, default='operator')
 
     class Meta:
         model = User

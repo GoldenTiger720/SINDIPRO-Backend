@@ -13,6 +13,7 @@ class User(AbstractUser):
     ROLE_CHOICES = [
         ('master', 'Master - Full Access'),
         ('manager', 'Manager - Admin Access'),
+        ('operator', 'Operator - Standard Access'),
         ('field', 'Field - Limited Access'),
         ('readonly', 'Read-Only Access'),
     ]
@@ -31,7 +32,7 @@ class User(AbstractUser):
     
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=20, blank=True)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='readonly')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='operator')
     is_active_user = models.BooleanField(default=True)
     building = models.ForeignKey('building_mgmt.Building', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
     created_at = models.DateTimeField(auto_now_add=True)
