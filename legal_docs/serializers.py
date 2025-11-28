@@ -1,6 +1,38 @@
 from rest_framework import serializers
 from .models import LegalDocument, LegalObligation, LegalTemplate, LegalObligationCompletion
 from building_mgmt.models import Building
+from datetime import date
+
+
+class MonthField(serializers.Field):
+    """
+    Custom field that accepts a month string (e.g., "01", "02") from frontend
+    and converts it to a date (first day of that month in current year) for storage.
+    When serializing, returns just the month string.
+    """
+    def to_representation(self, value):
+        """Convert date to month string for frontend"""
+        if value is None:
+            return None
+        return value.strftime('%m')
+
+    def to_internal_value(self, data):
+        """Convert month string to date for storage"""
+        if data is None or data == '':
+            return None
+        try:
+            # Accept either just month ("01") or full date ("2024-01-15")
+            if len(data) == 2:
+                # Month only - convert to first day of that month in current year
+                month = int(data)
+                if not 1 <= month <= 12:
+                    raise serializers.ValidationError("Month must be between 01 and 12")
+                return date(date.today().year, month, 1)
+            else:
+                # Full date string - parse it
+                return date.fromisoformat(data)
+        except (ValueError, TypeError):
+            raise serializers.ValidationError("Invalid month format. Expected 'MM' (e.g., '01') or 'YYYY-MM-DD'")
 
 
 class LegalDocumentSerializer(serializers.ModelSerializer):
@@ -20,7 +52,7 @@ class LegalObligationSerializer(serializers.ModelSerializer):
 class LegalTemplateSerializer(serializers.ModelSerializer):
     buildingType = serializers.CharField(source='building_type', required=False)
     requiresQuote = serializers.BooleanField(source='requires_quote')
-    dueMonth = serializers.DateField(source='due_month', required=False)
+    dueMonth = MonthField(source='due_month', required=False)
     responsibleEmails = serializers.CharField(source='responsible_emails', required=False)
     noticePeriod = serializers.IntegerField(source='notice_period', required=False)
     lastCompletionDate = serializers.DateField(source='last_completion_date', required=False, allow_null=True)

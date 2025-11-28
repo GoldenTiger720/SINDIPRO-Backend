@@ -137,20 +137,28 @@ class LegalTemplate(models.Model):
         return False
 
     def calculate_next_due_date(self, completion_date):
-        """Calculate next due date based on completion date and frequency"""
+        """Calculate next due date based on completion date and frequency.
+        Returns the first day of the calculated month since we only track months.
+        """
         from dateutil.relativedelta import relativedelta
 
         frequency_map = {
             'annual': relativedelta(years=1),
             'biannual': relativedelta(months=6),
+            'semiannual': relativedelta(months=6),
             'quarterly': relativedelta(months=3),
             'monthly': relativedelta(months=1),
+            'biennial': relativedelta(years=2),
+            'triennial': relativedelta(years=3),
+            'quinquennial': relativedelta(years=5),
             'one_time': None
         }
 
         delta = frequency_map.get(self.frequency)
         if delta:
-            return completion_date + delta
+            next_date = completion_date + delta
+            # Return first day of the month since we only track months
+            return next_date.replace(day=1)
         return None
 
 
