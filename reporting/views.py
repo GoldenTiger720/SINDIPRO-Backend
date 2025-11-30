@@ -2120,3 +2120,147 @@ def generate_report(request):
             {'error': f'Error generating report: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+
+# ============================================
+# Report Justification API Endpoints
+# ============================================
+
+from .models import ReportJustification
+from .serializers import ReportJustificationSerializer, ReportJustificationUpdateSerializer
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_report_justifications(request, building_id):
+    """
+    Get report justifications for a specific building.
+    Creates a new record if one doesn't exist.
+    """
+    try:
+        building = Building.objects.get(id=building_id)
+    except Building.DoesNotExist:
+        return Response(
+            {'error': 'Building not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Get or create justification record for this building
+    justification, created = ReportJustification.objects.get_or_create(
+        building=building,
+        defaults={'updated_by': request.user}
+    )
+
+    serializer = ReportJustificationSerializer(justification)
+    return Response(serializer.data)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_report_justifications(request, building_id):
+    """
+    Update report justifications for a specific building.
+    Creates a new record if one doesn't exist, then updates it.
+    """
+    try:
+        building = Building.objects.get(id=building_id)
+    except Building.DoesNotExist:
+        return Response(
+            {'error': 'Building not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Get or create justification record for this building
+    justification, created = ReportJustification.objects.get_or_create(
+        building=building,
+        defaults={'updated_by': request.user}
+    )
+
+    # Use partial update for PATCH, full update for PUT
+    partial = request.method == 'PATCH'
+    serializer = ReportJustificationUpdateSerializer(
+        justification,
+        data=request.data,
+        partial=partial
+    )
+
+    if serializer.is_valid():
+        serializer.save()
+        # Update the updated_by field
+        justification.updated_by = request.user
+        justification.save(update_fields=['updated_by', 'updated_at'])
+
+        # Return the full data
+        full_serializer = ReportJustificationSerializer(justification)
+        return Response(full_serializer.data)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Mapping of page numbers to their justification field names
+PAGE_JUSTIFICATION_FIELDS = {
+    3: ['page3_financial_justification'],
+    4: ['page4_income_justification', 'page4_expenses_justification', 'page4_balance_justification'],
+    5: ['page5_section1_justification', 'page5_section2_justification', 'page5_section3_justification'],
+    # Page 6 has no justification
+    7: ['page7_legal_justification'],
+    8: ['page8_water_justification', 'page8_electricity_justification', 'page8_gas_justification'],
+    9: ['page9_requests_justification'],
+    10: ['page10_calendar_justification'],
+}
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_page_justification(request, building_id, page_number):
+    """
+    Update justification fields for a specific page.
+    Only updates the fields relevant to the specified page number.
+    """
+    try:
+        building = Building.objects.get(id=building_id)
+    except Building.DoesNotExist:
+        return Response(
+            {'error': 'Building not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Check if this page has justification fields
+    if page_number not in PAGE_JUSTIFICATION_FIELDS:
+        return Response(
+            {'error': f'Page {page_number} does not have justification fields'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Get or create justification record for this building
+    justification, created = ReportJustification.objects.get_or_create(
+        building=building,
+        defaults={'updated_by': request.user}
+    )
+
+    # Filter request data to only include fields for this page
+    allowed_fields = PAGE_JUSTIFICATION_FIELDS[page_number]
+    filtered_data = {k: v for k, v in request.data.items() if k in allowed_fields}
+
+    if not filtered_data:
+        return Response(
+            {'error': f'No valid justification fields provided for page {page_number}. Expected: {allowed_fields}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Update only the specified fields
+    for field, value in filtered_data.items():
+        setattr(justification, field, value)
+
+    justification.updated_by = request.user
+    justification.save()
+
+    # Return the updated data for this page's fields
+    response_data = {
+        'page': page_number,
+        'building_id': building_id,
+        **{field: getattr(justification, field) for field in allowed_fields}
+    }
+
+    return Response(response_data)

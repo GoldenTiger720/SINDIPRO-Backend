@@ -106,18 +106,77 @@ class ReportAccess(models.Model):
         ('generate', 'Generate Reports'),
         ('manage', 'Full Management'),
     ]
-    
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     building = models.ForeignKey(Building, on_delete=models.CASCADE)
     report_template = models.ForeignKey(ReportTemplate, on_delete=models.CASCADE, null=True, blank=True)
     access_level = models.CharField(max_length=20, choices=ACCESS_LEVEL_CHOICES)
-    
+
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='granted_report_access')
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         unique_together = ('user', 'building', 'report_template')
-    
+
     def __str__(self):
         template_name = self.report_template.name if self.report_template else 'All Reports'
         return f"{self.user.username} - {template_name} - {self.access_level}"
+
+
+class ReportJustification(models.Model):
+    """
+    Stores justification text for each page section of a report.
+    Only one row should exist per building - uses get_or_create pattern.
+    """
+    building = models.OneToOneField(
+        Building,
+        on_delete=models.CASCADE,
+        related_name='report_justifications',
+        unique=True
+    )
+
+    # Page 1: Cover Page - No justification section
+    # Page 2: Summary Page - No justification section
+
+    # Page 3: Financial Page (Monthly Evolution)
+    page3_financial_justification = models.TextField(blank=True, default='')
+
+    # Page 4: Financial Page 2 (Account Summary) - Has 3 sections
+    page4_income_justification = models.TextField(blank=True, default='')
+    page4_expenses_justification = models.TextField(blank=True, default='')
+    page4_balance_justification = models.TextField(blank=True, default='')
+
+    # Page 5: Financial Page 3 (Miscellaneous Account) - Has 3 sections
+    page5_section1_justification = models.TextField(blank=True, default='')
+    page5_section2_justification = models.TextField(blank=True, default='')
+    page5_section3_justification = models.TextField(blank=True, default='')
+
+    # Page 6: Market Value Page - No justification section
+
+    # Page 7: Legal Requirements Page
+    page7_legal_justification = models.TextField(blank=True, default='')
+
+    # Page 8: Consumption Page - Separate fields for each utility type
+    page8_water_justification = models.TextField(blank=True, default='')
+    page8_electricity_justification = models.TextField(blank=True, default='')
+    page8_gas_justification = models.TextField(blank=True, default='')
+
+    # Page 9: Requests/Technical Calls Page
+    page9_requests_justification = models.TextField(blank=True, default='')
+
+    # Page 10: Calendar/Appointments Page
+    page10_calendar_justification = models.TextField(blank=True, default='')
+
+    # Page 11: Closing Page - No justification section
+
+    # Metadata
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Report Justifications - {self.building.building_name}"
+
+    class Meta:
+        verbose_name = 'Report Justification'
+        verbose_name_plural = 'Report Justifications'
