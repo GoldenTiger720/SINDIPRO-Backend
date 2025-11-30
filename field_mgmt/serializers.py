@@ -55,6 +55,17 @@ class FieldMgmtTechnicalImageSerializer(serializers.ModelSerializer):
         return None
 
 
+class FieldMgmtTechnicalListSerializer(serializers.ModelSerializer):
+    """Serializer for list view - excludes image data to avoid timeout issues"""
+    image_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = FieldMgmtTechnical
+        fields = ['id', 'code', 'company_email', 'title', 'description', 'location',
+                 'priority', 'image_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'code', 'created_at', 'updated_at']
+
+
 class FieldMgmtTechnicalSerializer(serializers.ModelSerializer):
     images = FieldMgmtTechnicalImageSerializer(many=True, read_only=True)
     photos = serializers.ListField(
@@ -62,7 +73,7 @@ class FieldMgmtTechnicalSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
-    
+
     class Meta:
         model = FieldMgmtTechnical
         fields = ['id', 'code', 'company_email', 'title', 'description', 'location',

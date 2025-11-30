@@ -85,7 +85,7 @@ DATABASES = {
         'OPTIONS': {
             'client_encoding': 'UTF8',
             'connect_timeout': 10,  # Connection timeout in seconds
-            'options': '-c statement_timeout=20000'  # Statement timeout 20 seconds
+            'options': '-c statement_timeout=120000'  # Statement timeout 120 seconds
         },
     }
 }

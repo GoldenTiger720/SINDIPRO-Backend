@@ -4,8 +4,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .models import FieldRequest, FieldMgmtTechnical
-from .serializers import FieldRequestSerializer, FieldMgmtTechnicalSerializer
+from django.db.models import Prefetch, Count
+from .models import FieldRequest, FieldMgmtTechnical, FieldMgmtTechnicalImage
+from .serializers import FieldRequestSerializer, FieldMgmtTechnicalSerializer, FieldMgmtTechnicalListSerializer
 
 
 @csrf_exempt
@@ -45,7 +46,7 @@ def technical_requests(request):
     Expected POST data: {company_email, title, description, location, priority, photos}
     """
     if request.method == 'GET':
-        requests = FieldMgmtTechnical.objects.all().order_by('-created_at')
+        requests = FieldMgmtTechnical.objects.prefetch_related('images').order_by('-created_at')
         serializer = FieldMgmtTechnicalSerializer(requests, many=True)
         return Response(serializer.data)
     
