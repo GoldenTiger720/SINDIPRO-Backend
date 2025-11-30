@@ -138,7 +138,7 @@ class LegalTemplate(models.Model):
 
     def calculate_next_due_date(self, completion_date):
         """Calculate next due date based on completion date and frequency.
-        Returns the first day of the calculated month since we only track months.
+        Returns the full date (year, month, day) for the next due date.
         """
         from dateutil.relativedelta import relativedelta
 
@@ -156,9 +156,8 @@ class LegalTemplate(models.Model):
 
         delta = frequency_map.get(self.frequency)
         if delta:
-            next_date = completion_date + delta
-            # Return first day of the month since we only track months
-            return next_date.replace(day=1)
+            # Return the full date, preserving the day
+            return completion_date + delta
         return None
 
 
