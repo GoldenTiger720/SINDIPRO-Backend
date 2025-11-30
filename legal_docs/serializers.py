@@ -4,26 +4,27 @@ from building_mgmt.models import Building
 from datetime import date
 
 
-class MonthField(serializers.Field):
+class DueDateField(serializers.Field):
     """
-    Custom field that accepts a month string (e.g., "01", "02") from frontend
-    and converts it to a date (first day of that month in current year) for storage.
-    When serializing, returns just the month string.
+    Custom field that accepts a date string (YYYY-MM-DD) from frontend
+    and stores it as a date. Also supports legacy month-only format ("MM")
+    for backwards compatibility.
+    When serializing, returns full date string (YYYY-MM-DD).
     """
     def to_representation(self, value):
-        """Convert date to month string for frontend"""
+        """Convert date to full date string for frontend"""
         if value is None:
             return None
-        return value.strftime('%m')
+        return value.strftime('%Y-%m-%d')
 
     def to_internal_value(self, data):
-        """Convert month string to date for storage"""
+        """Convert date string to date for storage"""
         if data is None or data == '':
             return None
         try:
-            # Accept either just month ("01") or full date ("2024-01-15")
+            # Accept either just month ("01") for legacy or full date ("2024-01-15")
             if len(data) == 2:
-                # Month only - convert to first day of that month in current year
+                # Legacy month only - convert to first day of that month in current year
                 month = int(data)
                 if not 1 <= month <= 12:
                     raise serializers.ValidationError("Month must be between 01 and 12")
@@ -32,7 +33,7 @@ class MonthField(serializers.Field):
                 # Full date string - parse it
                 return date.fromisoformat(data)
         except (ValueError, TypeError):
-            raise serializers.ValidationError("Invalid month format. Expected 'MM' (e.g., '01') or 'YYYY-MM-DD'")
+            raise serializers.ValidationError("Invalid date format. Expected 'YYYY-MM-DD' (e.g., '2025-03-15')")
 
 
 class LegalDocumentSerializer(serializers.ModelSerializer):
@@ -52,7 +53,7 @@ class LegalObligationSerializer(serializers.ModelSerializer):
 class LegalTemplateSerializer(serializers.ModelSerializer):
     buildingType = serializers.CharField(source='building_type', required=False)
     requiresQuote = serializers.BooleanField(source='requires_quote')
-    dueMonth = MonthField(source='due_month', required=False)
+    dueDate = DueDateField(source='due_month', required=False)
     responsibleEmails = serializers.CharField(source='responsible_emails', required=False)
     noticePeriod = serializers.IntegerField(source='notice_period', required=False)
     lastCompletionDate = serializers.DateField(source='last_completion_date', required=False, allow_null=True)
@@ -75,7 +76,7 @@ class LegalTemplateSerializer(serializers.ModelSerializer):
             'conditions',
             'requiresQuote',
             'active',
-            'dueMonth',
+            'dueDate',
             'noticePeriod',
             'responsibleEmails',
             'status',
