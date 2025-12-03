@@ -2211,7 +2211,7 @@ PAGE_JUSTIFICATION_FIELDS = {
 }
 
 
-@api_view(['PATCH'])
+@api_view(['PATCH', 'OPTIONS'])
 @permission_classes([IsAuthenticated])
 def update_page_justification(request, building_id, page_number):
     """
