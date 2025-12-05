@@ -4,15 +4,18 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from .models import LegalDocument, LegalObligation, LegalTemplate, LegalObligationCompletion
+from .models import LegalDocument, LegalObligation, LegalTemplate, LegalObligationCompletion, ObligationLibrary
 from .serializers import (
     LegalDocumentSerializer,
     LegalObligationSerializer,
     LegalTemplateSerializer,
     LegalObligationCompletionSerializer,
-    MarkCompletionSerializer
+    MarkCompletionSerializer,
+    ObligationLibrarySerializer,
+    ActivateLibraryObligationSerializer
 )
 from .tasks import send_legal_obligation_notification
+from building_mgmt.models import Building
 from datetime import datetime, timedelta
 from django_celery_beat.models import PeriodicTask, CrontabSchedule
 import json
@@ -73,6 +76,26 @@ def schedule_notification_email(template):
         print(f"Error scheduling notification email: {str(e)}")
 
 
+def add_to_library(template):
+    """
+    Helper function to add a legal template to the global library.
+    If an obligation with the same name already exists, it won't be duplicated.
+    """
+    library_entry, created = ObligationLibrary.objects.get_or_create(
+        name=template.name,
+        defaults={
+            'description': template.description,
+            'building_type': template.building_type,
+            'frequency': template.frequency,
+            'conditions': template.conditions,
+            'requires_quote': template.requires_quote,
+            'notice_period': template.notice_period,
+            'created_by': template.created_by
+        }
+    )
+    return library_entry, created
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def legal_template_handler(request):
@@ -89,6 +112,9 @@ def legal_template_handler(request):
 
         if serializer.is_valid():
             template = serializer.save()
+
+            # Automatically add to the global library
+            add_to_library(template)
 
             # Schedule email notification if required fields are present
             if template.due_month and template.notice_period and template.responsible_emails:
@@ -254,3 +280,122 @@ def get_all_completions(request):
     return Response({
         'completions': serializer.data
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_obligation_library(request):
+    """
+    Get all obligations in the global library.
+    This provides a complete repository of all unique legal obligations.
+    """
+    library_entries = ObligationLibrary.objects.all()
+    serializer = ObligationLibrarySerializer(library_entries, many=True)
+
+    return Response({
+        'library': serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def activate_library_obligation(request):
+    """
+    Activate a library obligation for a specific building.
+    This creates a new LegalTemplate for the building based on the library entry.
+    """
+    serializer = ActivateLibraryObligationSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response({
+            'error': 'Invalid data',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    validated_data = serializer.validated_data
+    library_obligation_id = validated_data['library_obligation_id']
+    building_id = validated_data['building_id']
+    due_date = validated_data['due_date']
+    responsible_emails = validated_data.get('responsible_emails', '')
+
+    # Get the library obligation
+    try:
+        library_entry = ObligationLibrary.objects.get(id=library_obligation_id)
+    except ObligationLibrary.DoesNotExist:
+        return Response({
+            'error': 'Library obligation not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # Get the building
+    try:
+        building = Building.objects.get(id=building_id)
+    except Building.DoesNotExist:
+        return Response({
+            'error': 'Building not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # Check if obligation already exists for this building
+    existing = LegalTemplate.objects.filter(
+        building=building,
+        name=library_entry.name,
+        created_by=request.user
+    ).first()
+
+    if existing:
+        return Response({
+            'error': 'This obligation already exists for this building',
+            'existing_template_id': existing.id
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Create new template for the building based on library entry
+    new_template = LegalTemplate.objects.create(
+        name=library_entry.name,
+        description=library_entry.description,
+        building=building,
+        building_type=library_entry.building_type,
+        frequency=library_entry.frequency,
+        conditions=library_entry.conditions,
+        requires_quote=library_entry.requires_quote,
+        notice_period=library_entry.notice_period,
+        due_month=due_date,
+        responsible_emails=responsible_emails,
+        active=True,
+        status='pending',
+        created_by=request.user
+    )
+
+    # Update usage count in the library
+    library_entry.usage_count += 1
+    library_entry.save()
+
+    # Schedule notification if required fields are present
+    if new_template.due_month and new_template.notice_period and new_template.responsible_emails:
+        schedule_notification_email(new_template)
+
+    template_serializer = LegalTemplateSerializer(new_template)
+
+    return Response({
+        'message': 'Obligation activated for building successfully',
+        'template': template_serializer.data
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_obligation_to_library(request):
+    """
+    Manually add a new obligation to the library.
+    """
+    serializer = ObligationLibrarySerializer(data=request.data, context={'request': request})
+
+    if serializer.is_valid():
+        library_entry = serializer.save()
+        return Response({
+            'message': 'Obligation added to library successfully',
+            'library_entry': ObligationLibrarySerializer(library_entry).data
+        }, status=status.HTTP_201_CREATED)
+
+    return Response({
+        'error': 'Invalid data',
+        'details': serializer.errors
+    }, status=status.HTTP_400_BAD_REQUEST)

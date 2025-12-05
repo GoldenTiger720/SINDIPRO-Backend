@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import LegalDocument, LegalObligation, LegalTemplate, LegalObligationCompletion
+from .models import LegalDocument, LegalObligation, LegalTemplate, LegalObligationCompletion, ObligationLibrary
 from building_mgmt.models import Building
 from datetime import date
 
@@ -121,3 +121,40 @@ class MarkCompletionSerializer(serializers.Serializer):
     completionDate = serializers.DateField(source='completion_date')
     notes = serializers.CharField(required=False, allow_blank=True)
     actualCost = serializers.DecimalField(source='actual_cost', max_digits=10, decimal_places=2, required=False, allow_null=True)
+
+
+class ObligationLibrarySerializer(serializers.ModelSerializer):
+    """Serializer for the global obligation library"""
+    buildingType = serializers.CharField(source='building_type', required=False, allow_null=True, allow_blank=True)
+    requiresQuote = serializers.BooleanField(source='requires_quote')
+    noticePeriod = serializers.IntegerField(source='notice_period', required=False)
+    usageCount = serializers.IntegerField(source='usage_count', read_only=True)
+
+    class Meta:
+        model = ObligationLibrary
+        fields = [
+            'id',
+            'name',
+            'description',
+            'buildingType',
+            'frequency',
+            'conditions',
+            'requiresQuote',
+            'noticePeriod',
+            'usageCount',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ('id', 'created_by', 'created_at', 'updated_at', 'usageCount')
+
+    def create(self, validated_data):
+        validated_data['created_by'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class ActivateLibraryObligationSerializer(serializers.Serializer):
+    """Serializer for activating a library obligation for a building"""
+    libraryObligationId = serializers.IntegerField(source='library_obligation_id')
+    buildingId = serializers.IntegerField(source='building_id')
+    dueDate = DueDateField(source='due_date')
+    responsibleEmails = serializers.CharField(source='responsible_emails', required=False, allow_blank=True)

@@ -178,3 +178,40 @@ class LegalObligationCompletion(models.Model):
 
     def __str__(self):
         return f"{self.template.name} - Completed on {self.completion_date}"
+
+
+class ObligationLibrary(models.Model):
+    """
+    Global library of legal obligations that serves as a master repository.
+    When a new obligation is created for a building, it is automatically added here.
+    This allows selecting obligations from the library when creating new buildings.
+    """
+    BUILDING_TYPE_CHOICES = [
+        ('residential', 'Residential'),
+        ('commercial', 'Commercial'),
+        ('mixed', 'Mixed Use'),
+        ('industrial', 'Industrial'),
+    ]
+
+    name = models.CharField(max_length=200, unique=True)
+    description = models.TextField()
+    building_type = models.CharField(max_length=20, choices=BUILDING_TYPE_CHOICES, null=True, blank=True)
+    frequency = models.CharField(max_length=50, default='annual')
+    conditions = models.TextField(blank=True)
+    requires_quote = models.BooleanField(default=False)
+    notice_period = models.IntegerField(default=14, help_text="Notice period in days")
+
+    # Track usage
+    usage_count = models.IntegerField(default=0, help_text="Number of times this obligation has been activated for buildings")
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Obligation Library Entry'
+        verbose_name_plural = 'Obligation Library'
+
+    def __str__(self):
+        return self.name
