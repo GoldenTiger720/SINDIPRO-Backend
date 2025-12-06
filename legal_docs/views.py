@@ -288,13 +288,46 @@ def get_obligation_library(request):
     """
     Get all obligations in the global library.
     This provides a complete repository of all unique legal obligations.
+    Automatically syncs all existing LegalTemplates to the library.
     """
+    # Sync all existing templates to the library (ensures library is always up-to-date)
+    sync_templates_to_library()
+
     library_entries = ObligationLibrary.objects.all()
     serializer = ObligationLibrarySerializer(library_entries, many=True)
 
     return Response({
         'library': serializer.data
     }, status=status.HTTP_200_OK)
+
+
+def sync_templates_to_library():
+    """
+    Sync all existing LegalTemplates to the ObligationLibrary.
+    This ensures the library contains all unique obligations from all condominiums.
+    Uses get_or_create to avoid duplicates (based on name).
+    """
+    # Get all active templates from all users/buildings
+    all_templates = LegalTemplate.objects.filter(active=True)
+
+    synced_count = 0
+    for template in all_templates:
+        library_entry, created = ObligationLibrary.objects.get_or_create(
+            name=template.name,
+            defaults={
+                'description': template.description,
+                'building_type': template.building_type,
+                'frequency': template.frequency,
+                'conditions': template.conditions or '',
+                'requires_quote': template.requires_quote,
+                'notice_period': template.notice_period,
+                'created_by': template.created_by
+            }
+        )
+        if created:
+            synced_count += 1
+
+    return synced_count
 
 
 @api_view(['POST'])
