@@ -17,10 +17,15 @@ class ReportJustificationSerializer(serializers.ModelSerializer):
             'page4_income_justification',
             'page4_expenses_justification',
             'page4_balance_justification',
-            # Page 5
+            # Page 5 - Sections for accounts 3-10
             'page5_section1_justification',
             'page5_section2_justification',
             'page5_section3_justification',
+            'page5_section4_justification',
+            'page5_section5_justification',
+            'page5_section6_justification',
+            'page5_section7_justification',
+            'page5_section8_justification',
             # Page 7
             'page7_legal_justification',
             # Page 8 - Separate fields for each utility type
@@ -50,10 +55,15 @@ class ReportJustificationUpdateSerializer(serializers.ModelSerializer):
             'page4_income_justification',
             'page4_expenses_justification',
             'page4_balance_justification',
-            # Page 5
+            # Page 5 - Sections for accounts 3-10
             'page5_section1_justification',
             'page5_section2_justification',
             'page5_section3_justification',
+            'page5_section4_justification',
+            'page5_section5_justification',
+            'page5_section6_justification',
+            'page5_section7_justification',
+            'page5_section8_justification',
             # Page 7
             'page7_legal_justification',
             # Page 8 - Separate fields for each utility type

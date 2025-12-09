@@ -146,10 +146,17 @@ class ReportJustification(models.Model):
     page4_expenses_justification = models.TextField(blank=True, default='')
     page4_balance_justification = models.TextField(blank=True, default='')
 
-    # Page 5: Financial Page 3 (Miscellaneous Account) - Has 3 sections
+    # Page 5: Financial Page 3 (Miscellaneous Account) - Has sections for accounts 3-10
+    # Original sections for accounts 3, 4, 5
     page5_section1_justification = models.TextField(blank=True, default='')
     page5_section2_justification = models.TextField(blank=True, default='')
     page5_section3_justification = models.TextField(blank=True, default='')
+    # Additional sections for accounts 6, 7, 8, 9, 10 (dynamic accounts beyond the first 5)
+    page5_section4_justification = models.TextField(blank=True, default='')
+    page5_section5_justification = models.TextField(blank=True, default='')
+    page5_section6_justification = models.TextField(blank=True, default='')
+    page5_section7_justification = models.TextField(blank=True, default='')
+    page5_section8_justification = models.TextField(blank=True, default='')
 
     # Page 6: Market Value Page - No justification section
 
