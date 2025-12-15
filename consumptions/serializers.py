@@ -5,13 +5,14 @@ from .models import ConsumptionRegister, ConsumptionAccount, SubAccount
 class ConsumptionRegisterSerializer(serializers.ModelSerializer):
     utilityType = serializers.CharField(source='utility_type')
     subAccount = serializers.SerializerMethodField(read_only=True)
+    building_id = serializers.PrimaryKeyRelatedField(source='building', read_only=True)
+    created_by_id = serializers.PrimaryKeyRelatedField(source='created_by', read_only=True)
 
     class Meta:
         model = ConsumptionRegister
-        fields = ['id', 'building_id', 'date', 'utilityType', 'value', 'subAccount', 'sub_account', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at', 'subAccount']
+        fields = ['id', 'building_id', 'date', 'utilityType', 'value', 'subAccount', 'sub_account', 'created_by_id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'building_id', 'created_by_id', 'created_at', 'updated_at', 'subAccount']
         extra_kwargs = {
-            'building_id': {'source': 'building', 'write_only': False},
             'sub_account': {'write_only': True, 'required': False},
         }
 
@@ -41,14 +42,13 @@ class ConsumptionAccountSerializer(serializers.ModelSerializer):
     utilityType = serializers.CharField(source='utility_type')
     paymentDate = serializers.DateField(source='payment_date', required=False, allow_null=True)
     isPaid = serializers.BooleanField(source='is_paid', required=False)
+    building_id = serializers.PrimaryKeyRelatedField(source='building', read_only=True)
+    created_by_id = serializers.PrimaryKeyRelatedField(source='created_by', read_only=True)
 
     class Meta:
         model = ConsumptionAccount
-        fields = ['id', 'building_id', 'month', 'utilityType', 'amount', 'paymentDate', 'isPaid', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
-        extra_kwargs = {
-            'building_id': {'source': 'building', 'write_only': False, 'required': False},
-        }
+        fields = ['id', 'building_id', 'month', 'utilityType', 'amount', 'paymentDate', 'isPaid', 'created_by_id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'building_id', 'created_by_id', 'created_at', 'updated_at']
 
     def to_internal_value(self, data):
         # Map frontend field names to model field names
@@ -68,14 +68,13 @@ class ConsumptionAccountSerializer(serializers.ModelSerializer):
 
 class SubAccountSerializer(serializers.ModelSerializer):
     utilityType = serializers.CharField(source='utility_type')
+    building_id = serializers.PrimaryKeyRelatedField(source='building', read_only=True)
+    created_by_id = serializers.PrimaryKeyRelatedField(source='created_by', read_only=True)
 
     class Meta:
         model = SubAccount
-        fields = ['id', 'building_id', 'utilityType', 'name', 'icon', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
-        extra_kwargs = {
-            'building_id': {'source': 'building', 'write_only': False, 'required': False},
-        }
+        fields = ['id', 'building_id', 'utilityType', 'name', 'icon', 'created_by_id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'building_id', 'created_by_id', 'created_at', 'updated_at']
 
     def to_internal_value(self, data):
         # Map frontend field names to model field names
