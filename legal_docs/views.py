@@ -100,7 +100,11 @@ def add_to_library(template):
 @permission_classes([IsAuthenticated])
 def legal_template_handler(request):
     if request.method == 'GET':
-        templates = LegalTemplate.objects.filter(created_by=request.user, active=True)
+        # Master role can see all templates, other roles see only their own
+        if request.user.role == 'master':
+            templates = LegalTemplate.objects.filter(active=True)
+        else:
+            templates = LegalTemplate.objects.filter(created_by=request.user, active=True)
         serializer = LegalTemplateSerializer(templates, many=True)
         
         return Response({
@@ -136,7 +140,11 @@ def legal_template_handler(request):
 @permission_classes([IsAuthenticated])
 def update_delete_legal_template(request, template_id):
     try:
-        template = get_object_or_404(LegalTemplate, id=template_id, created_by=request.user)
+        # Master role can manage all templates, other roles can only manage their own
+        if request.user.role == 'master':
+            template = get_object_or_404(LegalTemplate, id=template_id)
+        else:
+            template = get_object_or_404(LegalTemplate, id=template_id, created_by=request.user)
     except LegalTemplate.DoesNotExist:
         return Response({
             'error': 'Template not found or you do not have permission to access it'
@@ -186,7 +194,11 @@ def mark_obligation_completed(request, template_id):
     Mark a legal obligation as completed and calculate the next due date.
     """
     try:
-        template = get_object_or_404(LegalTemplate, id=template_id, created_by=request.user)
+        # Master role can manage all templates, other roles can only manage their own
+        if request.user.role == 'master':
+            template = get_object_or_404(LegalTemplate, id=template_id)
+        else:
+            template = get_object_or_404(LegalTemplate, id=template_id, created_by=request.user)
     except LegalTemplate.DoesNotExist:
         return Response({
             'error': 'Template not found or you do not have permission to access it'
@@ -248,7 +260,11 @@ def get_completion_history(request, template_id):
     Get completion history for a specific legal obligation template.
     """
     try:
-        template = get_object_or_404(LegalTemplate, id=template_id, created_by=request.user)
+        # Master role can view all templates, other roles can only view their own
+        if request.user.role == 'master':
+            template = get_object_or_404(LegalTemplate, id=template_id)
+        else:
+            template = get_object_or_404(LegalTemplate, id=template_id, created_by=request.user)
     except LegalTemplate.DoesNotExist:
         return Response({
             'error': 'Template not found or you do not have permission to access it'
@@ -269,8 +285,13 @@ def get_completion_history(request, template_id):
 def get_all_completions(request):
     """
     Get all completion history for all templates of the authenticated user.
+    Master role can see all completions, other roles see only their own.
     """
-    templates = LegalTemplate.objects.filter(created_by=request.user)
+    # Master role can see all templates, other roles see only their own
+    if request.user.role == 'master':
+        templates = LegalTemplate.objects.all()
+    else:
+        templates = LegalTemplate.objects.filter(created_by=request.user)
     completions = LegalObligationCompletion.objects.filter(
         template__in=templates
     ).select_related('template', 'completed_by')
@@ -368,11 +389,18 @@ def activate_library_obligation(request):
         }, status=status.HTTP_404_NOT_FOUND)
 
     # Check if obligation already exists for this building
-    existing = LegalTemplate.objects.filter(
-        building=building,
-        name=library_entry.name,
-        created_by=request.user
-    ).first()
+    # Master role checks for all users, other roles check only their own
+    if request.user.role == 'master':
+        existing = LegalTemplate.objects.filter(
+            building=building,
+            name=library_entry.name
+        ).first()
+    else:
+        existing = LegalTemplate.objects.filter(
+            building=building,
+            name=library_entry.name,
+            created_by=request.user
+        ).first()
 
     if existing:
         return Response({
