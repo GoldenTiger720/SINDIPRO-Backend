@@ -44,8 +44,11 @@ class ConsumptionAccountSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConsumptionAccount
-        fields = ['id', 'month', 'utilityType', 'amount', 'paymentDate', 'isPaid', 'created_at', 'updated_at']
+        fields = ['id', 'building_id', 'month', 'utilityType', 'amount', 'paymentDate', 'isPaid', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'building_id': {'source': 'building', 'write_only': False, 'required': False},
+        }
 
     def to_internal_value(self, data):
         # Map frontend field names to model field names
@@ -68,8 +71,11 @@ class SubAccountSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SubAccount
-        fields = ['id', 'utilityType', 'name', 'icon', 'created_at', 'updated_at']
+        fields = ['id', 'building_id', 'utilityType', 'name', 'icon', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'building_id': {'source': 'building', 'write_only': False, 'required': False},
+        }
 
     def to_internal_value(self, data):
         # Map frontend field names to model field names

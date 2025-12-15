@@ -83,6 +83,7 @@ class ConsumptionRegister(models.Model):
     utility_type = models.CharField(max_length=20, choices=UTILITY_TYPE_CHOICES)
     value = models.DecimalField(max_digits=10, decimal_places=3)
     sub_account = models.ForeignKey('SubAccount', on_delete=models.SET_NULL, null=True, blank=True, related_name='consumption_registers')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='consumption_registers')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -101,11 +102,13 @@ class ConsumptionAccount(models.Model):
         ('gas', 'Gas'),
     ]
 
+    building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='consumption_accounts', null=True, blank=True)
     month = models.CharField(max_length=7)  # Format: YYYY-MM
     utility_type = models.CharField(max_length=20, choices=UTILITY_TYPE_CHOICES)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date = models.DateField(null=True, blank=True)  # Made optional
     is_paid = models.BooleanField(default=False)  # Track payment status
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='consumption_accounts')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -124,16 +127,18 @@ class SubAccount(models.Model):
         ('gas', 'Gas'),
     ]
 
+    building = models.ForeignKey(Building, on_delete=models.CASCADE, related_name='sub_accounts', null=True, blank=True)
     utility_type = models.CharField(max_length=20, choices=UTILITY_TYPE_CHOICES)
     name = models.CharField(max_length=100)
     icon = models.CharField(max_length=10, blank=True, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='sub_accounts')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'consumptions_sub_account'
         ordering = ['utility_type', 'name']
-        unique_together = ('utility_type', 'name')
+        unique_together = ('building', 'utility_type', 'name')
 
     def __str__(self):
         return f"{self.utility_type} - {self.name}"

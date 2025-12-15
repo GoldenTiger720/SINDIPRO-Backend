@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from django.http import HttpResponse
 from .models import ConsumptionRegister, ConsumptionAccount, SubAccount
 from .serializers import ConsumptionRegisterSerializer, ConsumptionAccountSerializer, SubAccountSerializer
+from building_mgmt.models import Building
 import openpyxl
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -14,23 +15,67 @@ from datetime import datetime
 from decimal import Decimal
 
 
+def get_building_from_request(request):
+    """
+    Extract building_id from request data or query params and return the Building object.
+    Returns None if building_id is not provided or building doesn't exist.
+    """
+    building_id = request.data.get('building_id') or request.GET.get('building_id')
+    if building_id:
+        try:
+            return Building.objects.get(id=building_id)
+        except Building.DoesNotExist:
+            return None
+    return None
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def consumption_register(request):
     """
-    GET: Retrieve all consumption register entries with sub_account details.
-    POST: Create a new consumption register entry.
-    Expected POST data: {date, utilityType, value, subAccount (optional)}
+    GET: Retrieve consumption register entries with sub_account details.
+         - Master role: sees all data for the selected building
+         - Other roles: see only data they registered for the selected building
+    POST: Create a new consumption register entry for the selected building.
+    Expected POST data: {date, utilityType, value, building_id, subAccount (optional)}
     """
     if request.method == 'GET':
-        registers = ConsumptionRegister.objects.select_related('sub_account').all()
+        building_id = request.GET.get('building_id')
+
+        # Start with base queryset
+        registers = ConsumptionRegister.objects.select_related('sub_account', 'building')
+
+        # Filter by building if provided
+        if building_id:
+            registers = registers.filter(building_id=building_id)
+
+        # Role-based filtering: master sees all, others see only their own
+        if request.user.role != 'master':
+            registers = registers.filter(created_by=request.user)
+
         serializer = ConsumptionRegisterSerializer(registers, many=True)
         return Response(serializer.data)
 
     elif request.method == 'POST':
+        # Validate building_id is provided
+        building_id = request.data.get('building_id')
+        if not building_id:
+            return Response({
+                'error': 'building_id is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify building exists
+        try:
+            building = Building.objects.get(id=building_id)
+        except Building.DoesNotExist:
+            return Response({
+                'error': 'Building not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
         serializer = ConsumptionRegisterSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            # Save with building and created_by
+            serializer.save(building=building, created_by=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -42,12 +87,19 @@ def consumption_register_detail(request, register_id):
     GET: Retrieve a specific consumption register entry.
     PUT: Update a specific consumption register entry.
     DELETE: Delete a specific consumption register entry.
+    Role-based access: master can access all, others only their own.
     """
     try:
-        register = ConsumptionRegister.objects.select_related('sub_account').get(id=register_id)
+        # Master role can access all registers, others only their own
+        if request.user.role == 'master':
+            register = ConsumptionRegister.objects.select_related('sub_account').get(id=register_id)
+        else:
+            register = ConsumptionRegister.objects.select_related('sub_account').get(
+                id=register_id, created_by=request.user
+            )
     except ConsumptionRegister.DoesNotExist:
         return Response({
-            'error': 'Consumption register not found'
+            'error': 'Consumption register not found or you do not have permission to access it'
         }, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
@@ -75,19 +127,49 @@ def consumption_register_detail(request, register_id):
 @permission_classes([IsAuthenticated])
 def consumption_account(request):
     """
-    GET: Retrieve all consumption account entries.
-    POST: Create a new consumption account entry.
-    Expected POST data: {amount, month, utilityType}
+    GET: Retrieve consumption account entries.
+         - Master role: sees all data for the selected building
+         - Other roles: see only data they registered for the selected building
+    POST: Create a new consumption account entry for the selected building.
+    Expected POST data: {amount, month, utilityType, building_id}
     """
     if request.method == 'GET':
-        accounts = ConsumptionAccount.objects.all()
+        building_id = request.GET.get('building_id')
+
+        # Start with base queryset
+        accounts = ConsumptionAccount.objects.select_related('building')
+
+        # Filter by building if provided
+        if building_id:
+            accounts = accounts.filter(building_id=building_id)
+
+        # Role-based filtering: master sees all, others see only their own
+        if request.user.role != 'master':
+            accounts = accounts.filter(created_by=request.user)
+
         serializer = ConsumptionAccountSerializer(accounts, many=True)
         return Response(serializer.data)
 
     elif request.method == 'POST':
+        # Validate building_id is provided
+        building_id = request.data.get('building_id')
+        if not building_id:
+            return Response({
+                'error': 'building_id is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify building exists
+        try:
+            building = Building.objects.get(id=building_id)
+        except Building.DoesNotExist:
+            return Response({
+                'error': 'Building not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
         serializer = ConsumptionAccountSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            # Save with building and created_by
+            serializer.save(building=building, created_by=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -99,12 +181,17 @@ def consumption_account_detail(request, account_id):
     GET: Retrieve a specific consumption account entry.
     PUT: Update a specific consumption account entry.
     DELETE: Delete a specific consumption account entry.
+    Role-based access: master can access all, others only their own.
     """
     try:
-        account = ConsumptionAccount.objects.get(id=account_id)
+        # Master role can access all accounts, others only their own
+        if request.user.role == 'master':
+            account = ConsumptionAccount.objects.get(id=account_id)
+        else:
+            account = ConsumptionAccount.objects.get(id=account_id, created_by=request.user)
     except ConsumptionAccount.DoesNotExist:
         return Response({
-            'error': 'Consumption account not found'
+            'error': 'Consumption account not found or you do not have permission to access it'
         }, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
@@ -132,25 +219,54 @@ def consumption_account_detail(request, account_id):
 @permission_classes([IsAuthenticated])
 def sub_account_list(request):
     """
-    GET: Retrieve all sub-accounts (can filter by utility_type query param).
-    POST: Create a new sub-account.
-    Expected POST data: {utilityType, name, icon (optional)}
+    GET: Retrieve sub-accounts (can filter by utility_type and building_id query params).
+         - Master role: sees all sub-accounts for the selected building
+         - Other roles: see only sub-accounts they registered for the selected building
+    POST: Create a new sub-account for the selected building.
+    Expected POST data: {utilityType, name, building_id, icon (optional)}
     """
     if request.method == 'GET':
-        sub_accounts = SubAccount.objects.all()
+        building_id = request.GET.get('building_id')
+
+        # Start with base queryset
+        sub_accounts = SubAccount.objects.select_related('building')
+
+        # Filter by building if provided
+        if building_id:
+            sub_accounts = sub_accounts.filter(building_id=building_id)
 
         # Filter by utility_type if provided
         utility_type = request.GET.get('utility_type')
         if utility_type:
             sub_accounts = sub_accounts.filter(utility_type=utility_type)
 
+        # Role-based filtering: master sees all, others see only their own
+        if request.user.role != 'master':
+            sub_accounts = sub_accounts.filter(created_by=request.user)
+
         serializer = SubAccountSerializer(sub_accounts, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
+        # Validate building_id is provided
+        building_id = request.data.get('building_id')
+        if not building_id:
+            return Response({
+                'error': 'building_id is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify building exists
+        try:
+            building = Building.objects.get(id=building_id)
+        except Building.DoesNotExist:
+            return Response({
+                'error': 'Building not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
         serializer = SubAccountSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            # Save with building and created_by
+            serializer.save(building=building, created_by=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response({
             'error': 'Invalid data',
@@ -165,12 +281,17 @@ def sub_account_detail(request, sub_account_id):
     GET: Retrieve a specific sub-account.
     PUT: Update a specific sub-account.
     DELETE: Delete a specific sub-account.
+    Role-based access: master can access all, others only their own.
     """
     try:
-        sub_account = SubAccount.objects.get(id=sub_account_id)
+        # Master role can access all sub-accounts, others only their own
+        if request.user.role == 'master':
+            sub_account = SubAccount.objects.get(id=sub_account_id)
+        else:
+            sub_account = SubAccount.objects.get(id=sub_account_id, created_by=request.user)
     except SubAccount.DoesNotExist:
         return Response({
-            'error': 'Sub-account not found'
+            'error': 'Sub-account not found or you do not have permission to access it'
         }, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
@@ -199,13 +320,23 @@ def sub_account_detail(request, sub_account_id):
 def export_consumption_excel(request):
     """
     Export consumption register data to Excel file.
-    Optional query parameter: utility_type (water, electricity, gas)
+    Optional query parameters: utility_type (water, electricity, gas), building_id
+    Role-based access: master sees all, others only their own.
     """
     # Get query parameters
     utility_type = request.GET.get('utility_type', None)
+    building_id = request.GET.get('building_id', None)
 
     # Get consumption registers with related data
-    registers = ConsumptionRegister.objects.select_related('sub_account').all()
+    registers = ConsumptionRegister.objects.select_related('sub_account', 'building')
+
+    # Filter by building if provided
+    if building_id:
+        registers = registers.filter(building_id=building_id)
+
+    # Role-based filtering: master sees all, others see only their own
+    if request.user.role != 'master':
+        registers = registers.filter(created_by=request.user)
 
     # Filter by utility type if provided
     if utility_type:
@@ -407,12 +538,28 @@ def export_consumption_excel(request):
 def import_consumption_excel(request):
     """
     Import consumption register data from Excel file.
+    Required: building_id in request data.
     Expected file format matches the export format:
     - Row 1: Title
     - Row 2: Export date
     - Row 4: Headers (Date, Utility Type, Sub Account, Value, Unit)
     - Row 5+: Data rows
     """
+    # Validate building_id is provided
+    building_id = request.data.get('building_id') or request.GET.get('building_id')
+    if not building_id:
+        return Response({
+            'error': 'building_id is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Verify building exists
+    try:
+        building = Building.objects.get(id=building_id)
+    except Building.DoesNotExist:
+        return Response({
+            'error': 'Building not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
     # Check if file was uploaded
     if 'file' not in request.FILES:
         return Response({
@@ -470,15 +617,15 @@ def import_consumption_excel(request):
         # Create reverse mappings for choices
         utility_type_map = {v: k for k, v in ConsumptionRegister.UTILITY_TYPE_CHOICES}
 
-        # Get all sub-accounts to map names to IDs
+        # Get sub-accounts for the building to map names to IDs
         sub_accounts_by_name = {}
-        for sub_account in SubAccount.objects.all():
+        for sub_account in SubAccount.objects.filter(building=building):
             key = f"{sub_account.utility_type}_{sub_account.name}"
             sub_accounts_by_name[key] = sub_account
 
-        # Pre-fetch existing consumption registers by date and utility type to avoid duplicates
+        # Pre-fetch existing consumption registers for this building by date and utility type to avoid duplicates
         existing_registers = {}
-        for register in ConsumptionRegister.objects.all():
+        for register in ConsumptionRegister.objects.filter(building=building):
             key = f"{register.date}_{register.utility_type}_{register.sub_account_id if register.sub_account else 'none'}"
             existing_registers[key] = register
 
@@ -555,12 +702,14 @@ def import_consumption_excel(request):
                         'is_update': True
                     })
                 else:
-                    # Create new record
+                    # Create new record with building and created_by
                     new_register = ConsumptionRegister(
                         date=date_obj,
                         utility_type=utility_type,
                         sub_account=sub_account_obj,
-                        value=value
+                        value=value,
+                        building=building,
+                        created_by=request.user
                     )
                     consumption_data.append({
                         'register': new_register,
