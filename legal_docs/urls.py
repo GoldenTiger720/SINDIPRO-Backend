@@ -11,4 +11,5 @@ urlpatterns = [
     path('library/', views.get_obligation_library, name='get_obligation_library'),
     path('library/add/', views.add_obligation_to_library, name='add_obligation_to_library'),
     path('library/activate/', views.activate_library_obligation, name='activate_library_obligation'),
+    path('library/sync/', views.sync_library, name='sync_library'),
 ]

@@ -309,12 +309,10 @@ def get_obligation_library(request):
     """
     Get all obligations in the global library.
     This provides a complete repository of all unique legal obligations.
-    Automatically syncs all existing LegalTemplates to the library.
+    Note: Syncing is done when templates are created, not on every GET request.
     """
-    # Sync all existing templates to the library (ensures library is always up-to-date)
-    sync_templates_to_library()
-
-    library_entries = ObligationLibrary.objects.all()
+    # Optimized query - fetch all library entries directly without syncing
+    library_entries = ObligationLibrary.objects.all().order_by('-created_at')
     serializer = ObligationLibrarySerializer(library_entries, many=True)
 
     return Response({
@@ -460,3 +458,23 @@ def add_obligation_to_library(request):
         'error': 'Invalid data',
         'details': serializer.errors
     }, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def sync_library(request):
+    """
+    Manually sync all existing LegalTemplates to the ObligationLibrary.
+    This is an admin operation that should only be called when needed.
+    """
+    if request.user.role != 'master':
+        return Response({
+            'error': 'Only master users can sync the library'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    synced_count = sync_templates_to_library()
+
+    return Response({
+        'message': f'Library synced successfully. {synced_count} new entries added.',
+        'synced_count': synced_count
+    }, status=status.HTTP_200_OK)
