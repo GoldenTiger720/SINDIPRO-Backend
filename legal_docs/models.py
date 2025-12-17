@@ -117,6 +117,7 @@ class LegalTemplate(models.Model):
     due_month = models.DateField(null=True, blank=True)
     notice_period = models.IntegerField(default=14, help_text="Notice period in days")
     responsible_emails = models.TextField(blank=True, help_text="Comma-separated email addresses")
+    observations = models.TextField(blank=True, help_text="Additional observations or notes")
 
     # Completion tracking fields
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')

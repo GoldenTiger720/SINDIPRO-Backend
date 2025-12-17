@@ -79,6 +79,7 @@ class LegalTemplateSerializer(serializers.ModelSerializer):
             'dueDate',
             'noticePeriod',
             'responsibleEmails',
+            'observations',
             'status',
             'lastCompletionDate',
             'created_at',
@@ -158,3 +159,4 @@ class ActivateLibraryObligationSerializer(serializers.Serializer):
     buildingId = serializers.IntegerField(source='building_id')
     dueDate = DueDateField(source='due_date')
     responsibleEmails = serializers.CharField(source='responsible_emails', required=False, allow_blank=True)
+    observations = serializers.CharField(required=False, allow_blank=True)

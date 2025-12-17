@@ -369,6 +369,7 @@ def activate_library_obligation(request):
     building_id = validated_data['building_id']
     due_date = validated_data['due_date']
     responsible_emails = validated_data.get('responsible_emails', '')
+    observations = validated_data.get('observations', '')
 
     # Get the library obligation
     try:
@@ -418,6 +419,7 @@ def activate_library_obligation(request):
         notice_period=library_entry.notice_period,
         due_month=due_date,
         responsible_emails=responsible_emails,
+        observations=observations,
         active=True,
         status='pending',
         created_by=request.user
