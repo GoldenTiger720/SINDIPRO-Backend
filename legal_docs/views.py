@@ -478,3 +478,52 @@ def sync_library(request):
         'message': f'Library synced successfully. {synced_count} new entries added.',
         'synced_count': synced_count
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def update_delete_library_obligation(request, obligation_id):
+    """
+    Update or delete an obligation from the library.
+    """
+    try:
+        library_entry = ObligationLibrary.objects.get(id=obligation_id)
+    except ObligationLibrary.DoesNotExist:
+        return Response({
+            'error': 'Library obligation not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    # Only master role or the creator can modify/delete
+    if request.user.role != 'master' and library_entry.created_by != request.user:
+        return Response({
+            'error': 'You do not have permission to modify this obligation'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == 'PUT':
+        serializer = ObligationLibrarySerializer(
+            library_entry,
+            data=request.data,
+            context={'request': request},
+            partial=True
+        )
+
+        if serializer.is_valid():
+            updated_entry = serializer.save()
+            return Response({
+                'message': 'Library obligation updated successfully',
+                'library_entry': ObligationLibrarySerializer(updated_entry).data
+            }, status=status.HTTP_200_OK)
+
+        return Response({
+            'error': 'Invalid data',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        obligation_name = library_entry.name
+        library_entry.delete()
+
+        return Response({
+            'message': 'Library obligation deleted successfully',
+            'obligation_name': obligation_name
+        }, status=status.HTTP_200_OK)
