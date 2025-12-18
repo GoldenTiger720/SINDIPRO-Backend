@@ -183,8 +183,8 @@ class CurrentUserBuildingsView(APIView):
 
     GET /api/users/me/buildings/ - Get list of buildings for current user
 
-    - master/manager roles: Return all buildings
-    - operator role: Return only assigned buildings
+    - master role: Return all buildings
+    - manager/operator and other roles: Return only assigned buildings
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -192,8 +192,8 @@ class CurrentUserBuildingsView(APIView):
         """Get list of buildings for the current user based on their role"""
         user = request.user
 
-        # master and manager can see all buildings
-        if user.role in ['master', 'manager']:
+        # Only master can see all buildings
+        if user.role == 'master':
             buildings = Building.objects.all()
             return Response({
                 "buildings": [
@@ -202,7 +202,7 @@ class CurrentUserBuildingsView(APIView):
                 ]
             }, status=status.HTTP_200_OK)
 
-        # operator and other roles: only see assigned buildings
+        # manager, operator and other roles: only see assigned buildings
         building_accesses = BuildingAccess.objects.filter(
             user=user,
             is_active=True
