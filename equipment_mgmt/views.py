@@ -6,14 +6,47 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from .models import Equipment, MaintenanceRecord, EquipmentDocument
 from .serializers import EquipmentSerializer, MaintenanceRecordSerializer, EquipmentDocumentSerializer, EquipmentWithMaintenanceSerializer
+from auth_system.models import User
+
+
+def get_equipment_queryset(user):
+    """
+    Returns the equipment queryset based on user role.
+    Master users can see all equipment from manager and operator users.
+    Other users only see their own equipment.
+    """
+    if user.role == 'master':
+        # Master users can see all equipment from manager and operator users
+        return Equipment.objects.filter(
+            created_by__role__in=['master', 'manager', 'operator']
+        ).prefetch_related('maintenance_records')
+    else:
+        # Other users only see their own equipment
+        return Equipment.objects.filter(created_by=user).prefetch_related('maintenance_records')
+
+
+def get_equipment_for_user(user, equipment_id):
+    """
+    Returns a specific equipment if the user has access to it.
+    Master users can access equipment from manager and operator users.
+    Other users can only access their own equipment.
+    """
+    if user.role == 'master':
+        return get_object_or_404(
+            Equipment,
+            id=equipment_id,
+            created_by__role__in=['master', 'manager', 'operator']
+        )
+    else:
+        return get_object_or_404(Equipment, id=equipment_id, created_by=user)
 
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def equipment_list_create(request):
     if request.method == 'GET':
-        # Optimize query with prefetch_related to avoid N+1 queries
-        equipment = Equipment.objects.filter(created_by=request.user).prefetch_related('maintenance_records')
+        # Get equipment based on user role
+        equipment = get_equipment_queryset(request.user)
         serializer = EquipmentWithMaintenanceSerializer(equipment, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -37,7 +70,7 @@ def equipment_list_create(request):
 @api_view(['POST', 'GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def maintenance_record_list_create(request, equipment_id):
-    equipment = get_object_or_404(Equipment, id=equipment_id, created_by=request.user)
+    equipment = get_equipment_for_user(request.user, equipment_id)
 
     if request.method == 'GET':
         maintenance_records = MaintenanceRecord.objects.filter(equipment=equipment)
@@ -115,7 +148,7 @@ def maintenance_record_list_create(request, equipment_id):
 @api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def maintenance_record_detail(request, equipment_id, maintenance_id):
-    equipment = get_object_or_404(Equipment, id=equipment_id, created_by=request.user)
+    equipment = get_equipment_for_user(request.user, equipment_id)
     maintenance_record = get_object_or_404(MaintenanceRecord, id=maintenance_id, equipment=equipment)
 
     if request.method == 'PUT':
@@ -143,7 +176,7 @@ def maintenance_record_detail(request, equipment_id, maintenance_id):
 @api_view(['PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def equipment_detail(request, equipment_id):
-    equipment = get_object_or_404(Equipment, id=equipment_id, created_by=request.user)
+    equipment = get_equipment_for_user(request.user, equipment_id)
 
     if request.method == 'PUT':
         serializer = EquipmentSerializer(equipment, data=request.data, partial=True, context={'request': request})
