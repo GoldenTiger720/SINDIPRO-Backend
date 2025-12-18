@@ -6,6 +6,7 @@ from auth_system.serializers import UserSerializer
 from .models import BuildingAccess
 from .serializers import BuildingAccessSerializer, UserBuildingAssignmentSerializer
 from building_mgmt.models import Building
+from building_mgmt.serializers import BuildingReadSerializer
 
 User = get_user_model()
 
@@ -185,6 +186,8 @@ class CurrentUserBuildingsView(APIView):
 
     - master role: Return all buildings
     - manager/operator and other roles: Return only assigned buildings
+
+    Returns full building data including address for BuildingTable compatibility.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -194,23 +197,22 @@ class CurrentUserBuildingsView(APIView):
 
         # Only master can see all buildings
         if user.role == 'master':
-            buildings = Building.objects.all()
-            return Response({
-                "buildings": [
-                    {"id": b.id, "building_name": b.building_name}
-                    for b in buildings
-                ]
-            }, status=status.HTTP_200_OK)
+            buildings = Building.objects.select_related(
+                'address', 'alternative_address'
+            ).prefetch_related('towers__unit_distribution').all()
+            serializer = BuildingReadSerializer(buildings, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
         # manager, operator and other roles: only see assigned buildings
         building_accesses = BuildingAccess.objects.filter(
             user=user,
             is_active=True
-        ).select_related('building')
+        ).select_related(
+            'building',
+            'building__address',
+            'building__alternative_address'
+        ).prefetch_related('building__towers__unit_distribution')
 
-        return Response({
-            "buildings": [
-                {"id": ba.building.id, "building_name": ba.building.building_name}
-                for ba in building_accesses
-            ]
-        }, status=status.HTTP_200_OK)
+        buildings = [ba.building for ba in building_accesses]
+        serializer = BuildingReadSerializer(buildings, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
