@@ -10,7 +10,12 @@ from .serializers import ContactsEventSerializer, ContactsSupplierSerializer
 @permission_classes([IsAuthenticated])
 def event_handler(request):
     if request.method == 'GET':
-        events = ContactsEvent.objects.all()
+        # Filter by building_id if provided
+        building_id = request.query_params.get('building_id')
+        if building_id:
+            events = ContactsEvent.objects.filter(condominium=building_id)
+        else:
+            events = ContactsEvent.objects.all()
         serializer = ContactsEventSerializer(events, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
