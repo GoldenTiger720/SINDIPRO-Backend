@@ -138,8 +138,9 @@ class ReportJustification(models.Model):
     # Page 1: Cover Page - No justification section
     # Page 2: Summary Page - No justification section
 
-    # Page 3: Financial Page (Monthly Evolution)
+    # Page 3: Financial Page (Revenue vs Expenses and Balances Trend)
     page3_financial_justification = models.TextField(blank=True, default='')
+    page3_balances_justification = models.TextField(blank=True, default='')
 
     # Page 4: Financial Page 2 (Account Summary) - Has 3 sections
     page4_income_justification = models.TextField(blank=True, default='')

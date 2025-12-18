@@ -2200,9 +2200,11 @@ def update_report_justifications(request, building_id):
 
 # Mapping of page numbers to their justification field names
 PAGE_JUSTIFICATION_FIELDS = {
-    3: ['page3_financial_justification'],
+    3: ['page3_financial_justification', 'page3_balances_justification'],
     4: ['page4_income_justification', 'page4_expenses_justification', 'page4_balance_justification'],
-    5: ['page5_section1_justification', 'page5_section2_justification', 'page5_section3_justification'],
+    5: ['page5_section1_justification', 'page5_section2_justification', 'page5_section3_justification',
+        'page5_section4_justification', 'page5_section5_justification', 'page5_section6_justification',
+        'page5_section7_justification', 'page5_section8_justification'],
     # Page 6 has no justification
     7: ['page7_legal_justification'],
     8: ['page8_water_justification', 'page8_electricity_justification', 'page8_gas_justification'],

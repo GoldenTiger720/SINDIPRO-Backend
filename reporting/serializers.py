@@ -13,6 +13,7 @@ class ReportJustificationSerializer(serializers.ModelSerializer):
             'building_name',
             # Page 3
             'page3_financial_justification',
+            'page3_balances_justification',
             # Page 4
             'page4_income_justification',
             'page4_expenses_justification',
@@ -51,6 +52,7 @@ class ReportJustificationUpdateSerializer(serializers.ModelSerializer):
         fields = [
             # Page 3
             'page3_financial_justification',
+            'page3_balances_justification',
             # Page 4
             'page4_income_justification',
             'page4_expenses_justification',
